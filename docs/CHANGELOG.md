@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0 — 2026-11-25 · Report v2: evidence-based verdict
+- Anchored 1–4 rubric: every category of every round has written meanings for 1, 2, 3 and 4 (`lib/interview/rubric.ts`); the report shows what your score means and what each level requires. Core categories per round count double.
+- Deterministic verdict (`lib/interview/verdict.ts`): weighted mean → No Hire / Lean No / Lean Hire / Hire / Strong Hire at fixed thresholds, then caps that only lower it (a 1 in a core category, any 1, failing or too-slow code, unverified code, 2–3 hints). Every step is shown. Too little evidence (under 3 answers, under half the categories scored, no core category) gives no verdict instead of a guess. The AI never picks the verdict.
+- Coding rounds: Correctness is scored from the judge, not the AI.
+- Evidence quotes carry the time you said them (mm:ss), and are still discarded if they aren't in your transcript.
+- Objective metrics computed from timestamps (`lib/interview/metrics.ts`): duration, talk share, median reply time, questions asked; for coding, first run, first submit, accepted-at, runs before acceptance.
+- The one thing to fix (your lowest-scored category, ties broken by core weight) with a concrete action; 3 drills, which become your study-plan tasks.
+- Annotated final code: the evaluator must quote the line it comments on; notes whose quote isn't in your code are discarded.
+- "Practise next": two related problems (same topics, one step harder, unsolved) that open the setup with the problem pre-selected; "Retry this problem".
+- Interview list shows the verdict. Older (v1, 1–5) reports still display as they were, without a retro-fitted verdict, and score deltas only compare reports on the same scale.
+
 ## 0.4.1 — 2026-11-25 · DSA round: lists, trees, slow-solution detection
 - Linked lists and binary trees: new `ListNode` / `TreeNode` value types in all four harnesses (JSON arrays in, real nodes for the solution, arrays out; cycle-safe), node classes predefined and shown above the starter. 20 new problems (79 total).
 - Timed stress tests: 22 problems end Submit with one large worst-case input. Each call is timed inside the harness; a correct but slow answer is "Too slow" (status `time_limit`) with an explanation, and a judge timeout that only the stress input missed is reported as a complexity problem. Calibrated on Judge0 CE (brute force flagged in all four languages; optimal 0.4–370 ms vs 1–5 s budgets).

@@ -151,20 +151,27 @@
   <li><b>Mock mode</b> gives no hints and never names the algorithm. <b>Practice mode</b> offers three pre-written hints per problem, each more specific than the last (they don't use your AI quota).</li>
 </ul>
 <h3>In the report</h3>
-<p>A <b>Coding</b> section with facts measured by the platform, not judged by AI: the judge result and tests passed, the number of runs, hints used, large pastes, the stages you reached, your final code, and the optimal approach with its time and space complexity (revealed only after the interview).</p>
+<p>A <b>Coding</b> section with facts measured by the platform, not judged by AI: the judge result and tests passed, the number of runs, hints used, large pastes, the stages you reached, your final code with line-by-line notes, two related problems to practise next, and the optimal approach with its time and space complexity (revealed only after the interview).</p>
 <div class="warn">Code you Submit, and C++/Java Runs, are sent to the free public Judge0 service — a third party. Each account gets 80 judge calls a day so the free service stays usable for everyone.</div>
 
 <h2 class="break">7. Your interview report</h2>
 <p>Press <b>End</b>, then <b>Yes, end</b>. The report is ready in about 20–60 seconds and is saved permanently under <b>Mock interviews</b>.</p>
 <ul>
-  <li><b>Overall score (0–100):</b> the average of the scored rubric categories. If you've done the same round before, you'll see your change since last time.</li>
-  <li><b>Rubric:</b> each category is scored 1–5 with <i>exact quotes</i> from your answers as evidence. Quotes that can't be found in your transcript are discarded, and a category with no real evidence stays unscored rather than guessed.</li>
-  <li><b>Strengths, weaknesses and important mistakes.</b></li>
-  <li><b>Communication:</b> answer count, average length, and filler words per 100 words, counted directly from your transcript. Accent and voice are never assessed.</li>
-  <li><b>Next priorities:</b> automatically added to your dashboard as dated tasks.</li>
-  <li><b>Question-by-question feedback:</b> your actual answer, what was correct, incomplete, wrong or missing, what a strong answer covers, a better structure, topics to study, and likely follow-ups.</li>
+  <li><b>Mock verdict:</b> <b>No Hire, Lean No, Lean Hire, Hire</b> or <b>Strong Hire</b>, with a 0–100 score. The AI never picks it. It is computed by fixed rules from your rubric scores, and <b>How the verdict was decided</b> shows every step:
+    <ul>
+      <li>Weighted average of the rubric (the round's <i>core</i> categories count double): 3.5+ Strong Hire · 3.0+ Hire · 2.5+ Lean Hire · 2.0+ Lean No · below that No Hire.</li>
+      <li>Caps that can only lower it: a 1 in a core category (at most Lean No), a 1 anywhere (at most Lean Hire), Strong Hire needs every category at 3+, coding rounds whose code was never verified, failed tests or was too slow, and 2–3 hints.</li>
+      <li>With fewer than 3 answers, or too little evidence, you get <b>Not enough evidence</b> instead of a guess.</li>
+    </ul></li>
+  <li><b>The one thing to fix:</b> your lowest-scored area and one concrete action for next time.</li>
+  <li><b>3 drills:</b> specific practice tasks, added to your dashboard as dated tasks.</li>
+  <li><b>Measured, not judged:</b> duration, your share of the talking, median time to reply, questions you asked, and for coding rounds when you first ran, submitted and got accepted.</li>
+  <li><b>Rubric (1–4):</b> every category has a written meaning for each score, and the report shows what yours means. Scores must be backed by <i>exact quotes</i> from your answers, shown with the time you said them; quotes that can't be found in your transcript are discarded, and a category with no real evidence stays unscored. In coding rounds, <b>Correctness comes from the code judge</b>, not the AI.</li>
+  <li><b>Annotated final code:</b> notes under the exact lines they refer to (bug, edge case, complexity, style, good). A note must quote your code; notes that don't match are discarded.</li>
+  <li><b>Practise next</b> (coding rounds): two related problems, a step harder, that you haven't solved. <b>Retry this problem</b> starts the same one again.</li>
+  <li><b>Strengths, weaknesses, important mistakes, communication</b> (filler words per 100 words, counted directly; accent and voice are never assessed) and <b>question-by-question feedback</b>.</li>
 </ul>
-<div class="warn">Scores are practice feedback with a published method. They are not a hiring decision or a prediction of selection.</div>
+<div class="warn">The verdict is a practice signal with a published method. It is not a hiring decision or a prediction of selection. Reports created before 25 November 2026 keep their original 1–5 scale and have no verdict.</div>
 
 <h2>8. Settings and privacy</h2>
 <ul>
@@ -175,7 +182,7 @@
 </ul>
 
 <h2>9. Coming next</h2>
-<p>These are planned and shown under "Coming soon" in the sidebar: a more detailed interview report with a hire / no-hire style verdict, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, progress charts, tiers and achievements, and a more natural voice mode.</p>
+<p>These are planned and shown under "Coming soon" in the sidebar: tiers, XP and achievements, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, progress charts, and a more natural voice mode.</p>
 
 <h2>10. Tips for getting the most out of it</h2>
 <ol>

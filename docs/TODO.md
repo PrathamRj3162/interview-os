@@ -11,7 +11,7 @@
 - [ ] Phase 6 — Project deep-dive + public GitHub repo analysis
 - [x] Phase 7 — Mock interview studio: 9 personas × 10 rounds × 5 difficulties, mock vs practice (hints), turn-based browser voice (STT+TTS, barge-in, mute, pause), text fallback, code panel, idempotent evidence-verified report, tasks into study plan
   - [x] DSA live-coding round: CodeMirror 6, 79 problems (incl. lists/trees, stress tests v0.4.1), browser runners (Pyodide/JS) + Judge0, code-aware interviewer, phase machine, graded hints (v0.4.0)
-  - [ ] Report v2: anchored 1–4 rubric, objective metrics, timestamped quotes, deterministic verdict, drills, annotated code
+  - [x] Report v2: anchored 1–4 rubric, objective metrics, timestamped quotes, deterministic verdict, one thing to fix, drills, annotated code (v0.5.0)
   - [ ] Progress: tiers/XP/achievements, charts, mistake notebook
   - [ ] Voice v2: VAD, Whisper (Groq) / Kokoro TTS, streaming, latency display
   - [x] Linked-list / tree problems; timed stress tests for slow solutions (v0.4.1)

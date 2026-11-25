@@ -21,11 +21,11 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | AI resume claims: questions for every claim, risk flags, bullet rewrites (quotes are verified against your resume word for word) | ✅ |
 | **Mock interviews**: 9 personas × 10 round types × 5 difficulties, mock vs practice (hints), code panel | ✅ |
 | Voice mode (browser speech recognition + speech synthesis, turn-based, barge-in, text fallback) | ✅ |
-| **Reports**: rubric per round, evidence quotes checked against your transcript, deterministic overall score, per-question feedback, filler-word stats | ✅ |
-| Dashboard: today's tasks from report priorities, data-driven next step | ✅ |
+| **Reports (v2)**: anchored 1–4 rubric, timestamped quotes checked against your transcript, judge-backed correctness for coding, a rule-based verdict (No Hire → Strong Hire) shown step by step, the one thing to fix, 3 drills, measured metrics (reply time, talk share, coding timeline), annotated final code, per-question feedback | ✅ |
+| Dashboard: today's tasks from report drills, data-driven next step | ✅ |
 | **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 79 problems (incl. linked lists and trees) with hidden tests and timed worst-case stress tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
 | Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
-| Report v2 with hire verdict, tiers/XP, voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
+| Tiers/XP/achievements, voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
 
 ## Tech stack
 
