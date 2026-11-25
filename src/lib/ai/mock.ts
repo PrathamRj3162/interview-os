@@ -34,7 +34,7 @@ export function mockReply(messages: ChatMessage[]): string {
 
   if (system.includes("rigorous, fair evaluation")) {
     const ids = [...system.matchAll(/^- (\w+): /gm)].map((m) => m[1]);
-    const transcript = inner(last);
+    const transcript = inner(users.find((u) => u.includes('source="interview_transcript"')) ?? last);
     const answers = [...transcript.matchAll(/^A(\d+): (.+)$/gm)];
     const quote = (answers[0]?.[2] ?? "").split(/\s+/).slice(0, 6).join(" ");
     return JSON.stringify({
@@ -48,6 +48,20 @@ export function mockReply(messages: ChatMessage[]): string {
   }
 
   if (system.includes('{"hint"')) return JSON.stringify({ hint: "Consider the constraints again." });
+
+  if (system.includes("LIVE CODING ROUND")) {
+    const phase = /CURRENT PHASE: (\w+)/.exec(system)?.[1] ?? "clarify";
+    const lines: Record<string, string> = {
+      clarify: "Good. Any questions about the input before you start?",
+      brute: "What's the simplest correct approach, and its complexity?",
+      optimise: "Can you do better than that? Go ahead and code it when ready.",
+      code: "Sounds good — keep going and run it when you're ready.",
+      test: "Walk me through your code on the first example.",
+      complexity: "What are the final time and space complexities?",
+      wrap: "Thanks, that's time. Any questions for me?",
+    };
+    return JSON.stringify({ say: lines[phase] ?? lines.clarify, topic: phase, is_follow_up: false, advance_phase: true, should_end: phase === "wrap" });
+  }
 
   if (system.includes('Return JSON: {"say"')) {
     const candidate = users.filter((u) => u.includes("candidate_answer")).at(-1);

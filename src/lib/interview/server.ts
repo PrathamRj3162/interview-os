@@ -6,10 +6,10 @@ import type { Turn } from "./analysis";
 export async function loadInterview(supabase: SupabaseClient, id: string) {
   const { data } = await supabase
     .from("mock_interviews")
-    .select("id, user_id, kind, difficulty, persona, mode, input_mode, company, language, duration_min, resume_id, status, started_at, ended_at, overall_score, report")
+    .select("id, user_id, kind, difficulty, persona, mode, input_mode, company, language, duration_min, resume_id, status, started_at, ended_at, overall_score, report, problem_slug, phase, workspace")
     .eq("id", id)
     .maybeSingle();
-  return data as (InterviewRow & { user_id: string; resume_id: string | null; status: string; input_mode: string; ended_at: string | null; overall_score: number | null; report: unknown }) | null;
+  return data as (InterviewRow & { user_id: string; resume_id: string | null; status: string; input_mode: string; ended_at: string | null; overall_score: number | null; report: unknown; problem_slug: string | null; phase: string | null; workspace: unknown }) | null;
 }
 
 export async function loadTurns(supabase: SupabaseClient, id: string): Promise<(Turn & { id: number; created_at: string })[]> {

@@ -8,6 +8,7 @@ import { Field, FormMessage, Select } from "@/components/ui/form";
 import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS, type KindId, type PersonaId, type Difficulty } from "@/lib/interview/config";
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
 import { cn } from "@/lib/utils";
+import { PROBLEMS } from "@/lib/dsa/bank";
 
 const STEPS = ["Round", "Interviewer", "Details"] as const;
 const option = "cursor-pointer rounded-[var(--radius-md)] border px-4 py-3 text-sm transition-colors duration-[var(--duration-fast)] has-[:focus-visible]:shadow-[var(--focus-glow)]";
@@ -29,6 +30,8 @@ export function SetupForm({ defaults, resumes }: {
   const [resumeId, setResumeId] = useState(defaults.resumeId ?? "none");
   const [language, setLanguage] = useState(defaults.language ?? "none");
   const [company, setCompany] = useState(defaults.company ?? "none");
+  const [problem, setProblem] = useState("none");
+  const isDsa = kind === "dsa";
 
   return (
     <form action={action} className="space-y-6">
@@ -118,10 +121,22 @@ export function SetupForm({ defaults, resumes }: {
           </Field>
           <Field label="Programming language" htmlFor="language">
             <Select id="language" name="language" value={language} onChange={(e) => setLanguage(e.target.value)}>
-              <option value="none">Not relevant</option>
+              <option value="none">{isDsa ? "My profile's language" : "Not relevant"}</option>
               {Object.entries(LANGUAGES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </Select>
           </Field>
+          {isDsa && (
+            <Field label="Problem" htmlFor="problem_slug" hint="Pick one, or get a random problem you haven't solved yet at this difficulty.">
+              <Select id="problem_slug" name="problem_slug" value={problem} onChange={(e) => setProblem(e.target.value)}>
+                <option value="none">Pick one for me</option>
+                {(["easy", "medium", "hard"] as const).map((d) => (
+                  <optgroup key={d} label={d[0].toUpperCase() + d.slice(1)}>
+                    {PROBLEMS.filter((p) => p.difficulty === d).map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
+                  </optgroup>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="Target company" htmlFor="company" hint="Style practice only — never presented as real questions.">
             <Select id="company" name="company" value={company} onChange={(e) => setCompany(e.target.value)}>
               <option value="none">General</option>
@@ -136,6 +151,7 @@ export function SetupForm({ defaults, resumes }: {
               ["Round", KINDS[kind].name], ["Interviewer", PERSONAS[persona].name], ["Difficulty", difficulty], ["Mode", mode === "mock" ? "Mock (no hints)" : "Practice (hints)"],
               ["Duration", `${duration} min`], ["Answer by", input === "voice" ? "Voice" : "Typing"],
               ["Resume", resumes.find((r) => r.id === resumeId)?.file_name ?? "Not used"], ["Company style", company === "none" ? "General" : company],
+              ...(isDsa ? [["Problem", PROBLEMS.find((p) => p.slug === problem)?.title ?? "Random"]] : []),
             ].map(([k, v]) => <div key={k} className="flex justify-between gap-4"><dt className="text-muted">{k}</dt><dd className="truncate text-right capitalize">{v}</dd></div>)}
           </dl>
         </aside>

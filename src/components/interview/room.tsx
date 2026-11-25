@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useSpeechRecognition, useSpeechSynthesis } from "./use-speech";
+import { useDsaWorkspace, type DsaInit, type DsaWorkspace } from "@/components/dsa/use-dsa-workspace";
+import { ProblemPanel, EditorPanel, PhaseStepper, SplitPanes } from "@/components/dsa/panels";
+import type { Phase } from "@/lib/dsa/phases";
 
 type Turn = { id: number; role: "interviewer" | "candidate"; content: string; code?: string | null };
 
@@ -21,12 +24,25 @@ export type RoomProps = {
   durationMin: number;
   startedAt: string;
   initialTurns: Turn[];
+  /** Present for the DSA live-coding round. */
+  dsa?: DsaInit;
 };
 
 type Net = "idle" | "thinking" | "error";
 
 export function InterviewRoom(p: RoomProps) {
+  return p.dsa ? <DsaRoom {...p} dsa={p.dsa} /> : <RoomCore {...p} />;
+}
+
+function DsaRoom(p: RoomProps & { dsa: DsaInit }) {
+  const ws = useDsaWorkspace(p.id, p.dsa);
+  return <RoomCore {...p} ws={ws} />;
+}
+
+function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const router = useRouter();
+  const wsRef = useRef(ws);
+  useEffect(() => { wsRef.current = ws; });
   const [turns, setTurns] = useState<Turn[]>(p.initialTurns);
   const [draft, setDraft] = useState("");
   const [code, setCode] = useState(() => [...p.initialTurns].reverse().find((t) => t.code)?.code ?? "");
@@ -42,14 +58,15 @@ export function InterviewRoom(p: RoomProps) {
   const [ending, setEnding] = useState<null | "evaluating" | "failed" | "abandoned">(null);
   const [endMsg, setEndMsg] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [focusMode, setFocusMode] = useState(false);
+  // The coding round needs the width for three panes, so it starts in focus mode (sidebar hidden).
+  const [focusMode, setFocusMode] = useState(Boolean(ws));
   const [showKeys, setShowKeys] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const spokenRef = useRef<number>(p.initialTurns.at(-1)?.id ?? 0);
 
   const tts = useSpeechSynthesis();
   const mic = useSpeechRecognition(useCallback((text: string) => {
-    if (text) setDraft((d) => (d ? d.trimEnd() + " " : "") + text);
+    if (text) { setDraft((d) => (d ? d.trimEnd() + " " : "") + text); wsRef.current?.touch(); }
   }, []));
 
   // Clock
@@ -67,6 +84,8 @@ export function InterviewRoom(p: RoomProps) {
       const res = await fetch(`/api/interview/${p.id}/turn`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (data.turns) setTurns(data.turns);
+      if (data.phase) wsRef.current?.setPhase(data.phase as Phase);
+      if (typeof data.hintsUsed === "number") wsRef.current?.setHintsUsed(data.hintsUsed);
       if (!res.ok) {
         setNet("error"); setError(data.error ?? "Something went wrong."); setRetryable(Boolean(data.retryable ?? res.status >= 500));
         return false;
@@ -106,14 +125,21 @@ export function InterviewRoom(p: RoomProps) {
     if (!content || net === "thinking") return;
     mic.stop(); tts.cancel();
     setDraft("");
-    const ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null });
+    let ok: boolean;
+    if (ws) {
+      ws.touch();
+      await ws.flush(true); // the interviewer sees runs/pastes/idle that happened since its last message
+      ok = await post({ action: "answer", content, code: ws.code, language: ws.language });
+    } else {
+      ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null });
+    }
     if (!ok && !turns.some((t) => t.role === "candidate" && t.content === content)) setDraft(content);
   };
 
   const retry = () => {
     const lastCandidate = [...turns].reverse().find((t) => t.role === "candidate");
     if (turns.length === 0) void post({ action: "start" });
-    else if (turns.at(-1)?.role === "candidate" && lastCandidate) void post({ action: "answer", content: lastCandidate.content, code: lastCandidate.code ?? null });
+    else if (turns.at(-1)?.role === "candidate" && lastCandidate) void post({ action: "answer", content: lastCandidate.content, code: ws ? ws.code : lastCandidate.code ?? null, ...(ws ? { language: ws.language } : {}) });
     else void send();
   };
 
@@ -176,9 +202,7 @@ export function InterviewRoom(p: RoomProps) {
     );
   }
 
-  return (
-    <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 lg:h-[calc(100dvh-4rem)]">
-      {/* Header */}
+  const headerEl = (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-semibold">{p.title}</h1>
@@ -187,9 +211,9 @@ export function InterviewRoom(p: RoomProps) {
         <span className={cn("font-mono text-lg font-medium tabular-nums", remaining < 0 ? "text-danger" : remaining < 120 ? "text-warning" : "text-text")} aria-label="Time remaining">{fmt(remaining)}</span>
         <span className={cn("flex items-center gap-1.5 text-xs", mic.state === "listening" ? "text-success" : mic.state === "denied" || mic.state === "error" ? "text-danger" : "text-muted")}>
           {mic.state === "listening" ? <Mic className="size-3.5" aria-hidden /> : <MicOff className="size-3.5" aria-hidden />}
-          {mic.state === "listening" ? "Mic live" : mic.state === "denied" ? "Mic blocked" : mic.state === "unsupported" ? "No mic support" : "Mic off"}
+          <span className="hidden sm:inline">{mic.state === "listening" ? "Mic live" : mic.state === "denied" ? "Mic blocked" : mic.state === "unsupported" ? "No mic support" : "Mic off"}</span>
         </span>
-        <Button size="sm" variant="ghost" onClick={() => setShowKeys(true)} aria-label="Keyboard shortcuts"><Keyboard className="size-4" aria-hidden /></Button>
+        <Button size="sm" variant="ghost" onClick={() => setShowKeys(true)} aria-label="Keyboard shortcuts" className="hidden sm:inline-flex"><Keyboard className="size-4" aria-hidden /></Button>
         <Button size="sm" variant="ghost" onClick={() => setFocusMode(!focusMode)} aria-pressed={focusMode} aria-label={focusMode ? "Exit focus mode" : "Focus mode"}>
           {focusMode ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
         </Button>
@@ -198,16 +222,15 @@ export function InterviewRoom(p: RoomProps) {
           {status}
         </Badge>
       </div>
-
-      <div className={cn("grid min-h-0 flex-1 gap-3", showCode && "lg:grid-cols-2")}>
-        {/* Transcript */}
+  );
+  const transcriptEl = (
         <section aria-label="Interview transcript" className="flex min-h-0 flex-col rounded-xl border border-border bg-surface">
           <ol ref={listRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
             {visibleTurns.map((t) => (
-              <li key={t.id} className={cn("max-w-[90%] rounded-xl px-4 py-3 text-sm leading-6", t.role === "interviewer" ? (t.content.startsWith("[Hint]") ? "border border-warning/40 bg-warning/10" : "bg-surface-2") : "ml-auto bg-accent-soft")}>
-                <p className="mb-1 text-xs font-medium text-muted">{t.role === "interviewer" ? (t.content.startsWith("[Hint]") ? "Hint" : p.personaName) : "You"}</p>
-                <p className="whitespace-pre-wrap">{t.content.replace(/^\[Hint\]\s*/, "")}</p>
-                {t.code && <p className="mt-1 text-xs text-muted">+ code from editor</p>}
+              <li key={t.id} className={cn("max-w-[90%] rounded-xl px-4 py-3 text-sm leading-6", t.role === "interviewer" ? (/^\[Hint[^\]]*\]/.test(t.content) ? "border border-warning/40 bg-warning/10" : "bg-surface-2") : "ml-auto bg-accent-soft")}>
+                <p className="mb-1 text-xs font-medium text-muted">{t.role === "interviewer" ? (/^\[Hint[^\]]*\]/.test(t.content) ? (t.content.match(/^\[(Hint[^\]]*)\]/)?.[1] ?? "Hint") : p.personaName) : "You"}</p>
+                <p className="whitespace-pre-wrap">{t.content.replace(/^\[Hint[^\]]*\]\s*/, "")}</p>
+                {t.code && !ws && <p className="mt-1 text-xs text-muted">+ code from editor</p>}
               </li>
             ))}
             {net === "thinking" && (
@@ -218,35 +241,14 @@ export function InterviewRoom(p: RoomProps) {
             <div className="border-t border-border bg-accent-soft px-4 py-2 text-sm">The interviewer has wrapped up. <button className="font-medium text-accent underline" onClick={() => setConfirmEnd(true)}>End and get your report</button></div>
           )}
         </section>
-
-        {/* Code panel */}
-        {showCode && (
-          <section aria-label="Code editor" className="flex min-h-48 flex-col rounded-xl border border-border bg-surface">
-            <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted">
-              <span className="flex items-center gap-1 font-mono">editor<span aria-hidden className="inline-block h-3.5 w-[7px] animate-[var(--animate-caret)] bg-accent" /><span className="ml-2 font-sans">sent with your next answer</span></span>
-              <span>{code.split("\n").length} lines</span>
-            </div>
-            <textarea
-              value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} aria-label="Code"
-              onKeyDown={(e) => {
-                if (e.key === "Tab") { e.preventDefault(); const el = e.currentTarget; const s = el.selectionStart; setCode(code.slice(0, s) + "  " + code.slice(el.selectionEnd)); requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = s + 2; }); }
-              }}
-              className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-[13px] leading-5 focus:outline-none"
-              placeholder="// Write your solution here"
-            />
-          </section>
-        )}
-      </div>
-
-      {/* Errors */}
-      {(error || mic.error) && (
+  );
+  const errorsEl = (error || mic.error) ? (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
           <span className="flex-1">{error ?? mic.error}</span>
           {error && retryable && <Button size="sm" variant="secondary" onClick={retry}><RotateCcw className="size-4" aria-hidden /> Retry</Button>}
         </div>
-      )}
-
-      {/* Composer */}
+  ) : null;
+  const composerEl = (
       <div className="rounded-xl border border-border bg-surface p-3">
         <label htmlFor="answer" className="sr-only">Your answer</label>
         <textarea
@@ -280,9 +282,9 @@ export function InterviewRoom(p: RoomProps) {
               <input type="checkbox" checked={autoListen} onChange={(e) => setAutoListen(e.target.checked)} className="accent-[var(--accent)]" /> Auto-listen
             </label>
           )}
-          <Button size="sm" variant="ghost" onClick={() => setShowCode(!showCode)} aria-pressed={showCode}><Code2 className="size-4" aria-hidden /><span className="hidden sm:inline">Editor</span></Button>
+          {!ws && <Button size="sm" variant="ghost" onClick={() => setShowCode(!showCode)} aria-pressed={showCode}><Code2 className="size-4" aria-hidden /><span className="hidden sm:inline">Editor</span></Button>}
           {p.mode === "practice" && (
-            <Button size="sm" variant="ghost" disabled={net === "thinking" || paused || turns.length === 0} onClick={() => void post({ action: "hint" })}><Lightbulb className="size-4" aria-hidden /> Hint</Button>
+            <Button size="sm" variant="ghost" disabled={net === "thinking" || paused || turns.length === 0 || (ws ? ws.hintsUsed >= 3 : false)} onClick={() => void post({ action: "hint" })}><Lightbulb className="size-4" aria-hidden /> Hint{ws ? ` ${ws.hintsUsed}/3` : ""}</Button>
           )}
           <Button size="sm" variant="ghost" onClick={togglePause} aria-pressed={paused}>{paused ? <Play className="size-4" aria-hidden /> : <Pause className="size-4" aria-hidden />}<span className="hidden sm:inline">{paused ? "Resume" : "Pause"}</span></Button>
           <div className="ml-auto flex items-center gap-2">
@@ -302,13 +304,63 @@ export function InterviewRoom(p: RoomProps) {
           <p className="mt-2 text-[11px] text-muted">Turn-based voice using your browser&apos;s speech recognition and text-to-speech — not a real-time voice model. InterviewOS stores only the text transcript, never audio.</p>
         )}
       </div>
+  );
+  const keysDialog = (
       <Dialog open={showKeys} onClose={() => setShowKeys(false)} title="Keyboard shortcuts">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
-          {[["Hold Space", "Push-to-talk (when not typing)"], ["Ctrl/⌘ + Enter", "Send your answer"], ["Esc", "Pause / resume"], ["?", "Show this sheet"], ["Tab (in editor)", "Insert two spaces"]].map(([k, d]) => (
+          {[["Hold Space", "Push-to-talk (when not typing)"], ["Ctrl/⌘ + Enter", "Send your answer"], ["Esc", "Pause / resume"], ["?", "Show this sheet"], ...(ws ? [["Ctrl/⌘ + '", "Run the examples"], ["Ctrl/⌘ + Shift + Enter", "Submit (hidden tests)"], ["Tab (in editor)", "Indent"]] : [["Tab (in editor)", "Insert two spaces"]])].map(([k, d]) => (
             <div key={k} className="contents"><dt><kbd className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 font-mono text-xs">{k}</kbd></dt><dd className="text-muted">{d}</dd></div>
           ))}
         </dl>
       </Dialog>
+  );
+
+  if (ws) {
+    return (
+      <div className="flex h-[calc(100dvh-8rem)] min-h-[36rem] flex-col gap-3 lg:h-[calc(100dvh-4rem)]">
+        {headerEl}
+        <PhaseStepper phase={ws.phase} />
+        <SplitPanes panes={[
+          { id: "problem", label: "Problem", node: <ProblemPanel problem={ws.problem} /> },
+          { id: "code", label: "Code", node: <EditorPanel ws={ws} disabled={paused} /> },
+          { id: "chat", label: "Interviewer", node: (
+            <div className="flex h-full min-h-0 flex-col gap-3">
+              {transcriptEl}
+              {errorsEl}
+              {composerEl}
+            </div>
+          ) },
+        ]} />
+        {keysDialog}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 lg:h-[calc(100dvh-4rem)]">
+      {headerEl}
+      <div className={cn("grid min-h-0 flex-1 gap-3", showCode && "lg:grid-cols-2")}>
+        {transcriptEl}
+        {showCode && (
+          <section aria-label="Code editor" className="flex min-h-48 flex-col rounded-xl border border-border bg-surface">
+            <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted">
+              <span className="flex items-center gap-1 font-mono">editor<span aria-hidden className="inline-block h-3.5 w-[7px] animate-[var(--animate-caret)] bg-accent" /><span className="ml-2 font-sans">sent with your next answer</span></span>
+              <span>{code.split("\n").length} lines</span>
+            </div>
+            <textarea
+              value={code} onChange={(e) => setCode(e.target.value)} spellCheck={false} aria-label="Code"
+              onKeyDown={(e) => {
+                if (e.key === "Tab") { e.preventDefault(); const el = e.currentTarget; const s = el.selectionStart; setCode(code.slice(0, s) + "  " + code.slice(el.selectionEnd)); requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = s + 2; }); }
+              }}
+              className="min-h-0 flex-1 resize-none bg-transparent p-3 font-mono text-[13px] leading-5 focus:outline-none"
+              placeholder="// Write your solution here"
+            />
+          </section>
+        )}
+      </div>
+      {errorsEl}
+      {composerEl}
+      {keysDialog}
     </div>
   );
 }

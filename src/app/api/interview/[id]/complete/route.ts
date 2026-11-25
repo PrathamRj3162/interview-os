@@ -5,6 +5,9 @@ import { recordUsage } from "@/lib/ai/quota";
 import { evaluateInterview } from "@/lib/interview/engine";
 import { loadInterview, loadTurns } from "@/lib/interview/server";
 import { pairTurns } from "@/lib/interview/analysis";
+import type { DsaReport } from "@/lib/interview/engine";
+import { dsaContextFor, loadEvents, type Workspace } from "@/lib/dsa/server";
+import { PHASE_LABELS, type Phase } from "@/lib/dsa/phases";
 
 export const maxDuration = 120;
 
@@ -40,7 +43,40 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     // The report is not blocked by the daily quota: the candidate already invested the time.
-    const report = await evaluateInterview(iv, turns);
+    // DSA round: gather objective facts (judge results, hints, pastes) to ground the evaluation.
+    let dsaReport: DsaReport | undefined;
+    let facts: string | undefined;
+    const dsa = dsaContextFor(iv);
+    if (dsa) {
+      const [events, subs] = await Promise.all([
+        loadEvents(supabase, id),
+        supabase.from("submissions").select("status, passed, total, language, created_at").eq("interview_id", id).order("created_at"),
+      ]);
+      const ws = iv.workspace as Workspace | null;
+      const phases = ["intro", ...events.filter((e) => e.type === "phase").map((e) => String(e.payload.to))];
+      dsaReport = {
+        problem: { slug: dsa.problem.slug, title: dsa.problem.title, difficulty: dsa.problem.difficulty },
+        language: ws?.language ?? iv.language ?? "python", finalCode: (ws?.code ?? "").slice(0, 20000),
+        submissions: (subs.data ?? []).map((s) => ({ status: s.status, passed: s.passed, total: s.total, language: s.language, at: s.created_at })),
+        browserRuns: events.filter((e) => e.type === "run" && e.payload.runner === "browser").length,
+        judgeRuns: events.filter((e) => e.type === "run" && e.payload.runner === "judge0").length,
+        hintsUsed: events.filter((e) => e.type === "hint").length,
+        pastes: events.filter((e) => e.type === "paste").map((e) => ({ chars: Number(e.payload.chars) || 0 })),
+        idleMinutes: Math.round(events.filter((e) => e.type === "idle").reduce((a, e) => a + (Number(e.payload.seconds) || 0), 0) / 60),
+        phasesReached: [...new Set(phases)].map((p) => PHASE_LABELS[p as Phase] ?? p),
+        optimal: dsa.solution.optimal, brute: dsa.solution.brute,
+      };
+      const best = dsaReport.submissions.reduce<DsaReport["submissions"][number] | null>((b, s) => (!b || s.passed / Math.max(1, s.total) > b.passed / Math.max(1, b.total) ? s : b), null);
+      facts = [
+        `Problem: ${dsa.problem.title} (${dsa.problem.difficulty}). Optimal: ${dsa.solution.optimal.idea} — time ${dsa.solution.optimal.time}, space ${dsa.solution.optimal.space}.`,
+        `Submissions to the judge: ${dsaReport.submissions.length}${best ? `; best: ${best.status}, ${best.passed}/${best.total} tests` : " (never submitted)"}.`,
+        `Sample runs: ${dsaReport.browserRuns + dsaReport.judgeRuns}. Hints used: ${dsaReport.hintsUsed}/3. Large pastes into the editor: ${dsaReport.pastes.length}.`,
+        `Phases reached: ${dsaReport.phasesReached.join(" → ")}.`,
+        `Final code (${dsaReport.language}):\n${dsaReport.finalCode.slice(0, 6000)}`,
+      ].join("\n");
+    }
+    const report = await evaluateInterview(iv, turns, facts);
+    if (dsaReport) report.dsa = dsaReport;
     await recordUsage(supabase, user.id, "interview_report", report.provider, report.model);
     const done = await supabase.from("mock_interviews")
       .update({ status: "completed", report, overall_score: report.overall })

@@ -7,7 +7,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/supabase/server";
 import { loadInterview } from "@/lib/interview/server";
 import { KINDS, PERSONAS } from "@/lib/interview/config";
-import type { InterviewReport } from "@/lib/interview/engine";
+import type { InterviewReport, DsaReport } from "@/lib/interview/engine";
 
 export const metadata: Metadata = { title: "Interview report" };
 
@@ -68,6 +68,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <p className="mt-2 whitespace-pre-line text-sm leading-6">{r.summary}</p>
         </Card>
       </section>
+
+      {r.dsa && <DsaSection d={r.dsa} />}
 
       <section aria-labelledby="rubric-h">
         <h2 id="rubric-h" className="mb-3 text-lg font-medium">Rubric</h2>
@@ -161,5 +163,37 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       </section>
       <p className="text-xs text-muted">Evaluated by {r.provider} · {r.model}. AI feedback can be wrong — verify technical points against official documentation.</p>
     </article>
+  );
+}
+
+const SUB_LABEL: Record<string, string> = { accepted: "Accepted", wrong_answer: "Wrong answer", runtime_error: "Runtime error", compile_error: "Compile error", time_limit: "Time limit", error: "Error" };
+
+/** Objective coding facts: everything here is measured by the platform, not judged by AI. */
+function DsaSection({ d }: { d: DsaReport }) {
+  const best = d.submissions.reduce<DsaReport["submissions"][number] | null>((b, s) => (!b || s.passed / Math.max(1, s.total) > b.passed / Math.max(1, b.total) ? s : b), null);
+  const accepted = d.submissions.some((s) => s.status === "accepted");
+  return (
+    <section aria-labelledby="coding-h" className="space-y-3">
+      <h2 id="coding-h" className="text-lg font-medium">Coding — {d.problem.title} <span className="text-sm font-normal capitalize text-muted">({d.problem.difficulty})</span></h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card><p className="text-xs text-muted">Judge result</p><p className={`mt-1 font-semibold ${accepted ? "text-success" : best ? "text-danger" : "text-muted"}`}>{best ? `${SUB_LABEL[best.status] ?? best.status} · ${best.passed}/${best.total}` : "Not submitted"}</p><p className="mt-1 text-xs text-muted">{d.submissions.length} submission{d.submissions.length === 1 ? "" : "s"}</p></Card>
+        <Card><p className="text-xs text-muted">Runs on examples</p><p className="mt-1 font-semibold tabular-nums">{d.browserRuns + d.judgeRuns}</p><p className="mt-1 text-xs text-muted">{d.language}</p></Card>
+        <Card><p className="text-xs text-muted">Hints used</p><p className="mt-1 font-semibold tabular-nums">{d.hintsUsed}/3</p></Card>
+        <Card><p className="text-xs text-muted">Large pastes</p><p className={`mt-1 font-semibold tabular-nums ${d.pastes.length ? "text-warning" : ""}`}>{d.pastes.length}</p>{d.pastes.length > 0 && <p className="mt-1 text-xs text-muted">{d.pastes.map((p) => `${p.chars} chars`).join(", ")}</p>}</Card>
+      </div>
+      <Card>
+        <p className="text-xs text-muted">Phases reached</p>
+        <p className="mt-1 text-sm">{d.phasesReached.join(" → ")}</p>
+        <p className="mt-4 text-xs text-muted">Optimal approach (revealed after the interview)</p>
+        <p className="mt-1 text-sm">{d.optimal.idea} <span className="font-mono text-xs text-muted">time {d.optimal.time} · space {d.optimal.space}</span></p>
+        <p className="mt-1 text-xs text-muted">Brute force: {d.brute.idea} ({d.brute.time})</p>
+      </Card>
+      {d.finalCode && (
+        <details className="rounded-[var(--radius-lg)] border border-border bg-surface">
+          <summary className="cursor-pointer px-5 py-3 text-sm font-medium">Your final code ({d.language})</summary>
+          <pre className="overflow-x-auto border-t border-border p-5 font-mono text-xs leading-5">{d.finalCode}</pre>
+        </details>
+      )}
+    </section>
   );
 }

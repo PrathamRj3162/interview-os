@@ -22,10 +22,38 @@ const turnSchema = z.object({
   topic: z.string().trim().max(80).default(""),
   is_follow_up: z.boolean().default(false),
   should_end: z.boolean().default(false),
+  advance_phase: z.boolean().default(false),
 });
 export type InterviewerTurn = z.infer<typeof turnSchema>;
 
-function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean) {
+/** Extra context for the DSA live-coding round (code-aware interviewer). */
+export type DsaPrompt = {
+  title: string; statement: string; constraints: string[]; signature: string;
+  brute: string; optimal: string;
+  phase: string; phaseGoal: string; phases: string;
+  language: string; code: string; diff: string; facts: string[]; hintsUsed: number;
+  elapsedShare: number;
+};
+
+function dsaSection(iv: InterviewRow, d: DsaPrompt) {
+  return [
+    "",
+    "LIVE CODING ROUND — the candidate sees the problem statement and a code editor; you see their code and test runs.",
+    `Problem: "${d.title}". Function: ${d.signature}.`,
+    `Statement: ${d.statement}`,
+    `Constraints: ${d.constraints.join("; ")}`,
+    `FOR YOUR CALIBRATION ONLY — never reveal, paraphrase or hint at these${iv.mode === "mock" ? "" : " beyond a gentle nudge"}: brute force = ${d.brute}; optimal = ${d.optimal}.`,
+    `Phase flow: ${d.phases}. CURRENT PHASE: ${d.phase}. Goal now: ${d.phaseGoal}`,
+    "Set advance_phase=true only when the current phase's goal is clearly met and your message moves the conversation to the next phase.",
+    d.elapsedShare > 0.6 && ["intro", "clarify", "brute", "optimise"].includes(d.phase) ? "- Time check: over 60% of the time is gone and they haven't started coding — steer them to start coding now." : "",
+    iv.mode === "mock"
+      ? "- Never write code, never dictate lines, never name the algorithm they should use. If their code has a bug, ask a question that makes them look at that area."
+      : `- Practice mode: you may give a small nudge when they are stuck, but never full code. Hints used so far: ${d.hintsUsed}/3.`,
+    "- Ground every remark about their code in the code and run results below; don't invent test results.",
+  ].filter(Boolean).join("\n");
+}
+
+function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean, dsa?: DsaPrompt) {
   const persona = PERSONAS[iv.persona] ?? PERSONAS.professional;
   const lines = [
     `You are "${persona.name}", conducting a ${KINDS[iv.kind].name} for a ${ctx.role ?? "software engineer"} candidate (${ctx.experience ?? "unknown experience"}).`,
@@ -53,8 +81,11 @@ function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: numb
       ? `- This is the opening: greet the candidate${ctx.name ? ` (${ctx.name.split(" ")[0]})` : ""} in one sentence, explain the round in one sentence, then ask the first question.`
       : "",
     "",
-    'Return JSON: {"say": string, "topic": short label of what this question probes, "is_follow_up": boolean, "should_end": boolean}.',
+    dsa
+      ? 'Return JSON: {"say": string, "topic": short label, "is_follow_up": boolean, "advance_phase": boolean, "should_end": boolean}.'
+      : 'Return JSON: {"say": string, "topic": short label of what this question probes, "is_follow_up": boolean, "should_end": boolean}.',
   ];
+  if (dsa) lines.push(dsaSection(iv, dsa));
 
   const facts: string[] = [];
   if (ctx.claims.length && ["resume_screen", "project", "full", "company", "behavioral"].includes(iv.kind)) {
@@ -73,20 +104,32 @@ function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: numb
   return lines.filter((l) => l !== "").join("\n");
 }
 
-function historyMessages(turns: Turn[]): ChatMessage[] {
+function historyMessages(turns: Turn[], withCode = true): ChatMessage[] {
   return turns.slice(-40).map((t) =>
     t.role === "interviewer"
       ? { role: "assistant" as const, content: t.content }
-      : { role: "user" as const, content: untrusted("candidate_answer", t.content + (t.code ? `\n\n[Code in editor]\n${t.code.slice(0, 8000)}` : "")) },
+      : { role: "user" as const, content: untrusted("candidate_answer", t.content + (withCode && t.code ? `\n\n[Code in editor]\n${t.code.slice(0, 8000)}` : "")) },
   );
 }
 
-export async function nextInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number) {
+function workspaceMessage(d: DsaPrompt): ChatMessage {
+  return {
+    role: "user",
+    content: untrusted("workspace", [
+      `[Editor — ${d.language}]`, d.code.slice(0, 8000) || "(empty)",
+      "", "[Changed since the candidate's previous message]", d.diff || "(no changes)",
+      "", "[Room events since your last message]", d.facts.length ? d.facts.map((f) => `- ${f}`).join("\n") : "(none)",
+    ].join("\n")),
+  };
+}
+
+export async function nextInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa?: DsaPrompt) {
   const isFirst = turns.length === 0;
   const messages: ChatMessage[] = [
-    { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst) },
-    ...historyMessages(turns),
+    { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst, dsa) },
+    ...historyMessages(turns, !dsa),
   ];
+  if (dsa) messages.push(workspaceMessage(dsa));
   if (isFirst) messages.push({ role: "user", content: "(The candidate has joined. Begin the interview.)" });
   return generateObject(turnSchema, messages, { temperature: 0.6, maxTokens: 1200 });
 }
@@ -177,9 +220,20 @@ export type InterviewReport = {
   communication: ReturnType<typeof communicationStats> & { comment: string };
   evidence_dropped: number;
   provider: string; model: string;
+  /** DSA live-coding round: objective facts from the judge and the room (computed in code, not by AI). */
+  dsa?: DsaReport;
 };
 
-export async function evaluateInterview(iv: InterviewRow, turns: Turn[]): Promise<InterviewReport> {
+export type DsaReport = {
+  problem: { slug: string; title: string; difficulty: string };
+  language: string; finalCode: string;
+  submissions: { status: string; passed: number; total: number; language: string; at: string }[];
+  browserRuns: number; judgeRuns: number; hintsUsed: number; pastes: { chars: number }[]; idleMinutes: number;
+  phasesReached: string[];
+  optimal: { time: string; space: string; idea: string }; brute: { time: string; idea: string };
+};
+
+export async function evaluateInterview(iv: InterviewRow, turns: Turn[], objectiveFacts?: string): Promise<InterviewReport> {
   const pairs = pairTurns(turns);
   const rubric = RUBRICS[iv.kind];
   const candidateText = turns.filter((t) => t.role === "candidate").map((t) => t.content).join("\n");
@@ -205,6 +259,7 @@ export async function evaluateInterview(iv: InterviewRow, turns: Turn[]): Promis
       ].join("\n"),
     },
     { role: "user", content: untrusted("interview_transcript", transcript) },
+    ...(objectiveFacts ? [{ role: "user" as const, content: `Objective facts recorded by the platform (code judge results, hints, editor events) — use them, they are not candidate claims:\n${untrusted("platform_facts", objectiveFacts)}` }] : []),
   ], { temperature: 0.2, maxTokens: 8000 });
 
   // Verify evidence quotes are real; a category with a score but no surviving evidence is marked unscored.
