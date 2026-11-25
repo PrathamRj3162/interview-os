@@ -96,3 +96,17 @@ test("voice room: settings dialog, honest engine availability, settings persist"
   await page.getByRole("button", { name: "Voice settings" }).click();
   await expect(page.getByRole("dialog", { name: "Voice settings" }).getByLabel(/Send when I stop talking/)).not.toBeChecked();
 });
+
+// Opt-in (downloads ~130 MB of models): E2E_MODELS=1 npx playwright test e2e/voice.spec.ts -g "on-device models"
+test("on-device models: natural voice and Whisper run under the CSP", async ({ page }) => {
+  test.skip(process.env.E2E_MODELS !== "1", "set E2E_MODELS=1 to download and run the on-device models");
+  test.setTimeout(6 * 60_000);
+  await login(page);
+  await page.goto("/mic-check");
+  await page.waitForLoadState("networkidle");
+  await page.getByRole("button", { name: "Start mic test" }).click();
+  await page.getByRole("button", { name: /Natural voice \(on-device\)/ }).click();
+  await expect(page.getByText(/generated in \d+ ms/)).toBeVisible({ timeout: 240_000 });
+  await page.getByRole("button", { name: /Test on-device recognition/ }).click();
+  await expect(page.getByText(/\(\d+ ms\)/)).toBeVisible({ timeout: 240_000 });
+});

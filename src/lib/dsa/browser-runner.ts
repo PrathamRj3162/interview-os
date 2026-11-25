@@ -9,21 +9,16 @@ import type { ExecResult } from "./types";
 export const PYODIDE_VERSION = "0.28.3";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 
-const JS_WORKER = `
-self.onmessage = (e) => {
-  const { program, stdin } = e.data;
-  const out = [];
-  const fmt = (a) => a.map((x) => (typeof x === "string" ? x : (() => { try { return JSON.stringify(x); } catch { return String(x); } })())).join(" ");
-  for (const k of ["log", "info", "warn", "error", "debug"]) console[k] = (...a) => { if (out.length < 5000) out.push(fmt(a)); };
-  self.__STDIN__ = stdin;
-  const t0 = performance.now();
-  let fn;
-  try { fn = new Function(program); }
-  catch (err) { self.postMessage({ status: "compile_error", stdout: "", stderr: String(err && err.message || err), timeMs: 0 }); return; }
-  try { fn(); self.postMessage({ status: "ok", stdout: out.join("\\n") + "\\n", stderr: "", timeMs: Math.round(performance.now() - t0) }); }
-  catch (err) { self.postMessage({ status: "runtime_error", stdout: out.join("\\n"), stderr: String(err && err.stack || err), timeMs: Math.round(performance.now() - t0) }); }
-};
-`;
+/**
+ * The JavaScript runner builds one worker script per run (no eval/new Function, so the page's CSP can forbid
+ * eval). The prelude is a single line, so candidate line N is worker line N + 1; error locations are rewritten
+ * to the "<anonymous>:N+2" form the line-number mapper expects.
+ */
+function jsWorkerSource(program: string, stdin: string) {
+  const prelude = `const __out = []; const __fmt = (a) => a.map((x) => (typeof x === "string" ? x : (() => { try { return JSON.stringify(x); } catch { return String(x); } })())).join(" "); for (const k of ["log", "info", "warn", "error", "debug"]) console[k] = (...a) => { if (__out.length < 5000) __out.push(__fmt(a)); }; const __fix = (s) => String(s).replace(/blob:[^\\s)]+?:(\\d+):(\\d+)/g, (_, l, c) => "<anonymous>:" + (Number(l) + 1) + ":" + c); self.__STDIN__ = ${JSON.stringify(stdin)}; const __t0 = performance.now(); try {`;
+  const epilogue = `\n;self.postMessage({ status: "ok", stdout: __out.join("\\n") + "\\n", stderr: "", timeMs: Math.round(performance.now() - __t0) }); } catch (err) { self.postMessage({ status: "runtime_error", stdout: __out.join("\\n"), stderr: __fix(err && err.stack || err), timeMs: Math.round(performance.now() - __t0) }); }`;
+  return `${prelude}\n${program}${epilogue}`;
+}
 
 const PY_WORKER = `
 importScripts("${PYODIDE_URL}pyodide.js");
@@ -54,14 +49,19 @@ self.onmessage = async (e) => {
 const blobUrl = (src: string) => URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
 
 export async function runJavaScript(program: string, stdin: string, timeoutMs = 5000): Promise<ExecResult> {
-  const url = blobUrl(JS_WORKER);
+  const url = blobUrl(jsWorkerSource(program, stdin));
   const worker = new Worker(url);
   try {
     return await new Promise<ExecResult>((resolve) => {
       const timer = setTimeout(() => resolve({ status: "timeout", stdout: "", stderr: "", timeMs: timeoutMs, message: `Stopped after ${timeoutMs / 1000}s — is there an infinite loop?` }), timeoutMs);
       worker.onmessage = (e) => { clearTimeout(timer); resolve(e.data as ExecResult); };
-      worker.onerror = (e) => { clearTimeout(timer); resolve({ status: "runtime_error", stdout: "", stderr: e.message, timeMs: null }); };
-      worker.postMessage({ program, stdin });
+      // A script that fails to parse never runs: report it as a compile error at the candidate's line.
+      worker.onerror = (e) => {
+        clearTimeout(timer);
+        e.preventDefault();
+        const syntax = /SyntaxError/.test(e.message);
+        resolve({ status: syntax ? "compile_error" : "runtime_error", stdout: "", stderr: `${e.message}${e.lineno ? ` (<anonymous>:${e.lineno + 1})` : ""}`, timeMs: null });
+      };
     });
   } finally {
     worker.terminate();

@@ -22,8 +22,12 @@ const PROTECTED_PREFIXES = [
 const AUTH_PAGES = ["/login", "/signup"];
 
 /** Refreshes the auth session cookie and performs optimistic route guarding. */
-export async function updateSession(request: NextRequest) {
-  let response = NextResponse.next({ request });
+export async function updateSession(request: NextRequest, extraHeaders?: Headers) {
+  // Extra request headers (the CSP nonce) are forwarded to the app on every pass-through response.
+  const reqHeaders = new Headers(request.headers);
+  extraHeaders?.forEach((v, k) => reqHeaders.set(k, v));
+  const pass = () => NextResponse.next({ request: { headers: reqHeaders } });
+  let response = pass();
   if (!isSupabaseConfigured()) return response;
 
   const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
@@ -33,7 +37,8 @@ export async function updateSession(request: NextRequest) {
       },
       setAll(cookiesToSet, headers) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        reqHeaders.set("cookie", request.cookies.getAll().map((c) => `${c.name}=${c.value}`).join("; "));
+        response = pass();
         cookiesToSet.forEach(({ name, value, options }) =>
           response.cookies.set(name, value, options),
         );

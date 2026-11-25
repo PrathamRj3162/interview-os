@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Pixelify_Sans } from "next/font/google";
 import { getPrefs } from "@/lib/prefs";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
+import { ZodConfig } from "@/components/zod-config";
 
 // next/font self-hosts these at build time: no requests go to Google at runtime.
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -23,6 +24,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     // Font variables live on <html> so theme tokens (--font-sans/--font-display, defined on :root) can resolve them.
     <html lang="en" data-theme={theme} className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable}`}>
       <body className="min-h-dvh antialiased">
+        <ZodConfig />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
