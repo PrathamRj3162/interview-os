@@ -2,6 +2,7 @@ import "server-only";
 import type { ZodType } from "zod";
 import { getConfiguredProviders, type ProviderConfig, type ProviderId } from "./providers";
 import { extractJson, UNTRUSTED_GUARD } from "./json";
+import { mockEnabled, mockReply } from "./mock";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -66,6 +67,7 @@ export async function chat(
   messages: ChatMessage[],
   opts: { temperature?: number; maxTokens?: number; json?: boolean } = {},
 ): Promise<ChatResult> {
+  if (mockEnabled()) return { text: mockReply(messages), provider: "gemini", model: "mock" };
   const providers = getConfiguredProviders();
   if (providers.length === 0) throw new AIUnavailableError("No AI provider is configured on this server.");
   const guarded: ChatMessage[] = [{ role: "system", content: UNTRUSTED_GUARD }, ...messages];
@@ -122,5 +124,6 @@ export async function generateObject<T>(
 }
 
 export function aiStatus() {
+  if (mockEnabled()) return [{ id: "gemini" as const, label: "Mock AI (tests only)", model: "mock" }];
   return getConfiguredProviders().map((p) => ({ id: p.id, label: p.label, model: p.model }));
 }

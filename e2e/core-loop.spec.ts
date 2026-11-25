@@ -67,8 +67,12 @@ test("resume: rejects invalid files, analyses a real PDF, generates verbatim cla
 test("interview: text mock interview → evidence-based report → tasks on dashboard", async ({ page }) => {
   await login(page);
   await page.goto("/interview/new?kind=project");
+  // 3-step setup: Round (preselected) → Interviewer → Details
+  await page.getByRole("button", { name: /^Next/ }).click();
+  await page.getByRole("button", { name: /^Next/ }).click();
   await page.getByLabel("Duration").selectOption("10");
-  await page.getByText("Typing", { exact: true }).click();
+  await page.getByLabel("Answer by").selectOption("text");
+  await expect(page.getByRole("complementary", { name: "Summary" })).toContainText("Typing");
   await page.getByRole("button", { name: "Start interview" }).click();
   await expect(page).toHaveURL(/\/interview\/[0-9a-f-]{36}$/, { timeout: 15_000 });
 

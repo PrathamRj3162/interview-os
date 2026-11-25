@@ -12,7 +12,7 @@ test.afterAll(async () => {
 
 test("public pages and route guard", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("SDE interview");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("interview");
   await page.goto("/dashboard");
   await expect(page).toHaveURL(/\/login\?next=%2Fdashboard/);
   for (const p of ["/privacy", "/terms", "/signup", "/forgot-password"]) {
@@ -80,7 +80,7 @@ test("full candidate journey: sign up → onboarding → dashboard → persisten
 
   // 5. Dashboard shows real data and honest empty states
   await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByRole("heading", { name: "Hi E2E" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /(Hi|Hey) E2E/ })).toBeVisible();
   await expect(page.getByText("Google, Amazon")).toBeVisible();
   await expect(page.getByText("3 h")).toBeVisible();
   await expect(page.getByText("No submissions yet")).toBeVisible();

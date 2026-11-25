@@ -8,9 +8,20 @@ test.skip(!!process.env.CI, "local only");
 test.setTimeout(180_000);
 test.afterAll(async () => { await deleteUserIfExists(EMAIL); });
 
+// SHOTS_DIR=docs/redesign/before (or after) writes desktop + mobile shots for the redesign comparison.
+const DIR = process.env.SHOTS_DIR ?? "docs/screenshots";
+const MOBILE = Boolean(process.env.SHOTS_DIR);
+
 test("capture screenshots", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  const shot = (name: string) => page.screenshot({ path: `docs/screenshots/${name}.png`, fullPage: false });
+  const shot = async (name: string) => {
+    await page.screenshot({ path: `${DIR}/${name}.png`, fullPage: false });
+    if (MOBILE) {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.screenshot({ path: `${DIR}/${name}-mobile.png`, fullPage: false });
+      await page.setViewportSize({ width: 1440, height: 900 });
+    }
+  };
   await page.goto("/"); await shot("landing");
   const id = await ensureConfirmedUser(EMAIL, PW, "Asha Rao");
   await admin().from("profiles").update({ full_name: "Asha Rao", target_role: "backend", experience_level: "student", company_track: "product", target_companies: ["Amazon", "Google"], preferred_language: "python", daily_hours: 3, dsa_level: 3, system_design_level: 2, learning_style: "mixed", onboarded_at: new Date().toISOString() }).eq("id", id);
