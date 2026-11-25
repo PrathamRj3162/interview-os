@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 — 2026-11-25 · Learning modules: every sidebar item is live
+- DSA academy (`/dsa`): problem browser with topic/difficulty/status filters and search, problem pages with your submission history, 13 original pattern guides linked to bank problems by tag, "mark as studied".
+- CS fundamentals (`/fundamentals`): 60 original MCQs across OS, DBMS, networks and OOP; answer key server-only, graded by a server action, stored in `quiz_attempts`; explanations on the result page; every miss becomes a flashcard.
+- Revision (`/revision`): SM-2 spaced repetition (`lib/learn/sm2.ts`); review session with Again/Hard/Good/Easy; add your own cards; import missed concepts from interview reports.
+- Study planner (`/planner`): deterministic weekly plan (`lib/learn/planner.ts`) from weak report areas, unsolved problems, weakest patterns, quiz accuracy, due cards and round variety, within your daily budget and deadline; overdue list; add/complete/delete tasks.
+- System design lab (`/system-design`): HLD and LLD frameworks plus 12 case studies with collapsible reference sections; "Practise this with Nisha" starts a round focused on that case (migration 0006 adds `mock_interviews.topic`).
+- Project deep-dive (`/projects`): add projects, read a public GitHub repo through the REST API (metadata, file list, README, up to two manifests — listed on the page), AI summary and likely questions (rules-based fallback without AI), and a deep-dive round focused on that project (`mock_interviews.project_id`). Analysis columns are server-only writes.
+
 ## 0.8.0 — 2026-11-25 · Company styles, interviewers, next steps, notifications, public profiles
 - Security: interview status/report/score and judge submissions are server-only writes (migration 0005, column grants); users could previously have set them through the Data API with their own session. TRUNCATE/REFERENCES/TRIGGER revoked from API roles. Covered by an E2E test that tries the forged writes with a real user session.
 - Company style map for 25 companies with a clear "style practice — not actual company questions" label; it steers the interviewer prompt and favours matching DSA topics. New Company styles page.

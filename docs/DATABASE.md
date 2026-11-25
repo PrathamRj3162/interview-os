@@ -27,3 +27,7 @@ Static content (problems, lessons, quizzes) is referenced by `slug` and lives in
 - **Server-only writes.** `authenticated` may insert only the setup columns of `mock_interviews` and update only `phase`, `workspace`, `user_rating`, `rating_note`; it can no longer insert/update `submissions`. Status, report, score and judge submissions are written by the service role inside the app, always scoped by `user_id`. TRUNCATE/REFERENCES/TRIGGER revoked from API roles.
 - `public_profile(handle)` — `security definer`, returns JSON only when the owner opted in: first name, role, join date and the activity metadata the XP engine needs (no transcripts, resume, code or email). Executable by `anon`.
 
+## 0006 — Focused practice
+- `mock_interviews.topic` (≤200 chars, e.g. a system design case) and `project_id` (FK → projects, on delete set null); both insertable by the user.
+- `projects`: users may update only `title`, `description`, `technologies`, `repo_url`; `repo_snapshot` and `analysis` are written by the server.
+

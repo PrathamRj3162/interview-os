@@ -10,6 +10,11 @@ Mutations are Next.js Server Actions (POST, same-origin, CSRF-protected by Next'
 | setAiConsent | app/actions/profile.ts | checkbox | Gates sending resume text to AI |
 | setPublicProfile | app/actions/profile.ts | is_public, public_handle, public_show_scores | Opt-in public page at `/u/:handle`; reserved and taken handles rejected |
 | rateInterview | app/actions/interview.ts | id, rating 1–5, note? | Emoji rating of your own interview |
+| markProgress | app/actions/learn.ts | itemType, slug, done | Lessons and design cases studied (`user_progress`) |
+| gradeQuiz | app/actions/learn.ts | topic, ids, a_<id> | Server-side grading; misses → flashcards |
+| reviewCard / addCard / deleteCard / cardsFromReports | app/actions/learn.ts | — | SM-2 review and deck management |
+| generateWeek / addTask / deleteTask / toggleTask | app/actions/tasks.ts | — | Planner; tasks are your own rows (RLS) |
+| addProject / analyseProject / deleteProject | app/actions/projects.ts | title, repo_url… | Public GitHub only; analysis written with the service role |
 | deleteAccount | app/actions/profile.ts | confirm="DELETE" | Service role; deletes user (cascade) then storage |
 
 Routes: `GET /api/health` → `{ ok, database, ai: [providerIds] }`. `GET /auth/callback` → email confirm / recovery.

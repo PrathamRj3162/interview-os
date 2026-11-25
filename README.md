@@ -31,7 +31,12 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | **Next steps**: suggested difficulty from your recent verdicts; Retry / Next harder / Different round; emoji rating; paste detection flagged in reports | ✅ |
 | **Notifications** (in-app bell: reports, tasks due, streak at risk, decay, achievements) and an **opt-in public profile** (`/u/handle`, noindex, server-verified stats) | ✅ |
 | Resume checks include bullet length (5–30 words) and dates (one format, valid ranges, newest first, Expected for future) | ✅ |
-| CS fundamentals academy, system design lab | 🚧 planned |
+| **DSA academy**: 79 problems with filters and solved status, 13 original pattern guides (when to use, template, pitfalls), one-click practice | ✅ |
+| **CS fundamentals**: 60 original questions (OS, DBMS, networks, OOP) graded on the server, explanations, accuracy per topic; misses become flashcards | ✅ |
+| **Revision**: SM-2 spaced-repetition flashcards from quiz misses, interview reports or your own | ✅ |
+| **Study planner**: a week planned from your measured gaps within your daily time, with the reason for each task; add/complete/delete tasks | ✅ |
+| **System design lab**: 8 HLD + 4 LLD case studies with reveal-as-you-go reference designs; practise the same case with the architect interviewer | ✅ |
+| **Project deep-dive**: add projects, analyse a public GitHub repo (metadata, README, manifests) into likely questions; practise a focused deep dive | ✅ |
 
 ## Tech stack
 
@@ -39,6 +44,7 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 - **Supabase**: Postgres with Row Level Security on every table, Auth, private Storage
 - **AI**: provider-agnostic adapter over OpenAI-compatible APIs. Fallback chain: Gemini (free tier) → Groq → OpenRouter `:free` models → Ollama. It never routes to a paid model.
 - **Code execution**: Pyodide + Web Workers in the browser; [Judge0](https://judge0.com) (public CE by default, self-hostable) on the server
+- **Voice**: Web Speech API, on-device VAD (Web Audio), optional Kokoro-82M TTS in a worker, optional Whisper via Groq
 - **zod** validation on every action/route and on every AI response
 - **Vitest** unit tests, **Playwright** end-to-end tests on a deterministic mock AI (no quota used), GitHub Actions CI, gitleaks secret scan
 - Hosted on **Vercel** (Hobby)
@@ -49,12 +55,19 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 src/
   proxy.ts                  session refresh + route guard
   app/(auth)/               login, signup, password reset
-  app/(app)/                authenticated app: dashboard, resume, interview, settings
-  app/api/                  health check, interview turn/complete routes
+  app/(app)/                authenticated app: dashboard, resume, interview, dsa, fundamentals, revision,
+                            planner, system-design, projects, companies, progress, mic-check, settings
+  app/u/[handle]/           opt-in public profile (security-definer RPC)
+  app/api/                  health, interview turn/run/events/complete, voice STT, notifications
   app/actions/              server actions (zod-validated)
-  components/               UI primitives, shell, resume, interview (voice hooks, room)
+  components/               UI primitives, shell (nav, bell), resume, interview (room, avatars), dsa, voice, progress, learn
   lib/ai/                   provider chain, JSON/injection guards, per-user quota
-  lib/resume/               PDF/DOCX extraction, deterministic resume rules
+  lib/resume/               PDF/DOCX extraction, deterministic resume rules (incl. bullet length, dates)
+  lib/interview/            prompts, anchored rubric, verdict, metrics, suggestions, company styles
+  lib/progress/             XP, levels, tiers, achievements, bests
+  lib/voice/                VAD, sentence chunking for TTS
+  lib/learn/                fundamentals bank, SM-2, weekly planner, design cases
+  lib/projects/             GitHub repo snapshot and analysis
   lib/interview/            personas, rubrics, interviewer engine, evaluator, transcript analysis
   lib/services/             AI resume analysis
   lib/dsa/                  problem bank, harnesses, graders, Judge0 + browser runners, phase machine
