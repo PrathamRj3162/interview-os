@@ -14,6 +14,38 @@ const inner = (s: string) => s.replace(/^[\s\S]*?<untrusted[^>]*>\n?/, "").repla
 
 export function mockReply(messages: ChatMessage[]): string {
   const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+  // Interviewer turns stream as plain text + a trailing @@META line.
+  if (system.includes("@@META")) {
+    const nudge = messages.at(-1)?.content.startsWith("(No message from the candidate");
+    const j = JSON.parse(mockTurnJson(messages, system)) as { say: string } & Record<string, unknown>;
+    const { say, ...meta } = j;
+    return `${nudge ? "I noticed something in your editor. What are you thinking right now?" : say}\n@@META ${JSON.stringify(nudge ? { ...meta, advance_phase: false, should_end: false } : meta)}`;
+  }
+  return mockReplyJson(messages, system);
+}
+
+function mockTurnJson(messages: ChatMessage[], system: string): string {
+  const users = messages.filter((m) => m.role === "user").map((m) => m.content);
+  if (system.includes("LIVE CODING ROUND")) {
+    const phase = /CURRENT PHASE: (\w+)/.exec(system)?.[1] ?? "clarify";
+    const lines: Record<string, string> = {
+      clarify: "Good. Any questions about the input before you start?",
+      brute: "What's the simplest correct approach, and its complexity?",
+      optimise: "Can you do better than that? Go ahead and code it when ready.",
+      code: "Sounds good — keep going and run it when you're ready.",
+      test: "Walk me through your code on the first example.",
+      complexity: "What are the final time and space complexities?",
+      wrap: "Thanks, that's time. Any questions for me?",
+    };
+    return JSON.stringify({ say: lines[phase] ?? lines.clarify, topic: phase, is_follow_up: false, advance_phase: true, should_end: phase === "wrap" });
+  }
+  const candidate = users.filter((u) => u.includes("candidate_answer")).at(-1);
+  if (!candidate) return JSON.stringify({ say: "Hi! Let's begin. Walk me through the project you're proudest of.", topic: "intro", is_follow_up: false, should_end: false });
+  const words = inner(candidate).split(/\s+/).slice(0, 6).join(" ");
+  return JSON.stringify({ say: `You mentioned "${words}". Why that choice over the alternatives?`, topic: "justification", is_follow_up: true, should_end: false });
+}
+
+function mockReplyJson(messages: ChatMessage[], system: string): string {
   const users = messages.filter((m) => m.role === "user").map((m) => m.content);
   const last = users.at(-1) ?? "";
 
@@ -69,25 +101,5 @@ export function mockReply(messages: ChatMessage[]): string {
     });
   }
 
-  if (system.includes("LIVE CODING ROUND")) {
-    const phase = /CURRENT PHASE: (\w+)/.exec(system)?.[1] ?? "clarify";
-    const lines: Record<string, string> = {
-      clarify: "Good. Any questions about the input before you start?",
-      brute: "What's the simplest correct approach, and its complexity?",
-      optimise: "Can you do better than that? Go ahead and code it when ready.",
-      code: "Sounds good — keep going and run it when you're ready.",
-      test: "Walk me through your code on the first example.",
-      complexity: "What are the final time and space complexities?",
-      wrap: "Thanks, that's time. Any questions for me?",
-    };
-    return JSON.stringify({ say: lines[phase] ?? lines.clarify, topic: phase, is_follow_up: false, advance_phase: true, should_end: phase === "wrap" });
-  }
-
-  if (system.includes('Return JSON: {"say"')) {
-    const candidate = users.filter((u) => u.includes("candidate_answer")).at(-1);
-    if (!candidate) return JSON.stringify({ say: "Hi! Let's begin. Walk me through the project you're proudest of.", topic: "intro", is_follow_up: false, should_end: false });
-    const words = inner(candidate).split(/\s+/).slice(0, 6).join(" ");
-    return JSON.stringify({ say: `You mentioned "${words}". Why that choice over the alternatives?`, topic: "justification", is_follow_up: true, should_end: false });
-  }
   return JSON.stringify({ ok: true });
 }

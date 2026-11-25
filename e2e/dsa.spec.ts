@@ -64,6 +64,8 @@ test("DSA round: code, run, hint, submit, report", async ({ page }) => {
   await page.getByRole("button", { name: "Run", exact: true }).click();
   await expect(page.getByText("Wrong answer")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/0\/3 passed · run · in browser/)).toBeVisible();
+  // Proactive interviewer: a failed run gets a reaction without the candidate saying anything (streamed).
+  await expect(page.getByRole("region", { name: "Interview transcript" }).getByText("I noticed something in your editor")).toBeVisible({ timeout: 20_000 });
 
   // Graded hint (practice mode), logged and counted
   await page.getByRole("button", { name: /Hint 0\/3/ }).click();

@@ -54,6 +54,8 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const [code, setCode] = useState(() => [...p.initialTurns].reverse().find((t) => t.code)?.code ?? "");
   const [showCode, setShowCode] = useState(p.coding);
   const [net, setNet] = useState<Net>("idle");
+  /** The interviewer's reply while it streams in (null when nothing is streaming). */
+  const [liveText, setLiveText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryable, setRetryable] = useState(false);
   const [voiceOut, setVoiceOut] = useState(p.inputMode === "voice");
@@ -89,14 +91,74 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const fmt = (s: number) => `${s < 0 ? "-" : ""}${Math.floor(Math.abs(s) / 60)}:${String(Math.abs(s) % 60).padStart(2, "0")}`;
 
   // Keep transcript scrolled to latest
-  useEffect(() => { listRef.current?.lastElementChild?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns, net]);
+  useEffect(() => { listRef.current?.lastElementChild?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns, net, liveText]);
 
   const noteAi = voice.noteAi;
+  // What happens after the interviewer finishes speaking (kept in a ref so the stream reader sees the latest).
+  const afterSpeech = useRef<() => void>(() => {});
+  const canSpeak = useRef(false);
+  useEffect(() => {
+    canSpeak.current = voiceOut && tts.supported && !paused;
+    afterSpeech.current = () => { if (autoListen && mic.supported) mic.start(); else if (mic.state !== "listening") mic.stop(); };
+  });
+
+  /** Reads the streamed reply: show it as it arrives, start speaking at the first sentence. */
+  const readStream = useCallback(async (res: Response, t0: number): Promise<boolean> => {
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    let buf = "", text = "", speakingStarted = false;
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) >= 0) {
+        const block = buf.slice(0, sep); buf = buf.slice(sep + 2);
+        const event = /^event: (\w+)/m.exec(block)?.[1];
+        const raw = /^data: (.*)$/m.exec(block)?.[1];
+        if (!event || !raw) continue;
+        const data = JSON.parse(raw);
+        if (event === "delta") {
+          if (!text) noteAi(Date.now() - t0); // time to the interviewer's first words
+          text += data.text;
+          setLiveText(text);
+          if (canSpeak.current) {
+            if (!speakingStarted) {
+              speakingStarted = true;
+              if (p.inputMode === "voice" && voice.settings.bargeIn && mic.supported) mic.monitor();
+              tts.beginSpeech(() => afterSpeech.current());
+            }
+            tts.pushSpeech(data.text);
+          }
+        } else if (event === "done") {
+          const newest = data.turns?.at(-1);
+          if (speakingStarted && newest) { spokenRef.current = newest.id; tts.endSpeech(); }
+          setLiveText(null);
+          setTurns(data.turns);
+          if (data.phase) wsRef.current?.setPhase(data.phase as Phase);
+          if (data.shouldEnd) setWrapUp(true);
+          setNet("idle");
+          return true;
+        } else if (event === "error") {
+          if (speakingStarted) tts.cancel();
+          setLiveText(null);
+          if (data.turns) setTurns(data.turns);
+          setNet("error"); setError(data.error ?? "Something went wrong."); setRetryable(Boolean(data.retryable));
+          return false;
+        }
+      }
+    }
+    setLiveText(null);
+    setNet("error"); setError("The connection dropped while the interviewer was replying. Your answer is saved — press Retry."); setRetryable(true);
+    return false;
+  }, [noteAi, tts, mic, p.inputMode, voice.settings.bargeIn]);
+
   const post = useCallback(async (body: object) => {
     setNet("thinking"); setError(null); setRetryable(false);
     try {
       const t0 = Date.now();
       const res = await fetch(`/api/interview/${p.id}/turn`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (res.ok && res.body && (res.headers.get("content-type") ?? "").includes("text/event-stream")) return await readStream(res, t0);
       const data = await res.json().catch(() => ({}));
       if (res.ok) noteAi(Date.now() - t0);
       if (data.turns) setTurns(data.turns);
@@ -113,7 +175,41 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
       setNet("error"); setError("Connection lost. Check your network — your answer will be resent when you press Retry."); setRetryable(true);
       return false;
     }
-  }, [p.id, noteAi]);
+  }, [p.id, noteAi, readStream]);
+
+  // ── Proactive interviewer (coding round): react to long silence, a failed run/submit, or a big paste ──
+  const lastNudge = useRef(0);
+  const nudge = useCallback(async (reason: "idle" | "failed_run" | "paste", detail: string) => {
+    const w = wsRef.current;
+    if (!w || net !== "idle" || paused || liveText != null || tts.speaking || mic.userSpeaking || turns.length === 0) return;
+    if (Date.now() - lastNudge.current < 120_000) return; // at most one nudge every 2 minutes (the server enforces it too)
+    lastNudge.current = Date.now();
+    await w.flush(true); // the interviewer sees the latest code and run results
+    const t0 = Date.now();
+    const res = await fetch(`/api/interview/${p.id}/turn`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "nudge", reason, detail, code: w.code, language: w.language }) }).catch(() => null);
+    if (res?.ok && res.body && (res.headers.get("content-type") ?? "").includes("text/event-stream")) { setNet("thinking"); await readStream(res, t0); }
+    // Skipped (rate limit / nothing to react to) is silent: a nudge is never worth an error banner.
+  }, [net, paused, liveText, tts.speaking, mic.userSpeaking, turns.length, p.id, readStream]);
+  const nudgeRef = useRef(nudge);
+  useEffect(() => { nudgeRef.current = nudge; });
+
+  const outcome = ws?.outcome;
+  useEffect(() => {
+    if (outcome && outcome.status !== "accepted" && outcome.status !== "error") void nudgeRef.current("failed_run", `${outcome.kind === "submit" ? "submission" : "run"}: ${outcome.status.replace("_", " ")}, ${outcome.passed}/${outcome.total} tests`);
+  }, [outcome]);
+  const pasteN = ws?.bigPaste.n ?? 0;
+  const pasteChars = ws?.bigPaste.chars ?? 0;
+  useEffect(() => { if (pasteN > 0) void nudgeRef.current("paste", `${pasteChars} characters`); }, [pasteN, pasteChars]);
+  useEffect(() => {
+    if (!ws) return;
+    const t = setInterval(() => {
+      const w = wsRef.current;
+      if (!w || !["code", "test"].includes(w.phase)) return;
+      const idle = w.idleMs();
+      if (idle >= 90_000) void nudgeRef.current("idle", `about ${Math.round(idle / 1000)} seconds without typing or speaking`);
+    }, 15_000);
+    return () => clearInterval(t);
+  }, [ws]);
 
   // Open the interview (idempotent on reload)
   const startedRef = useRef(false);
@@ -262,7 +358,12 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
                 {t.code && !ws && <p className="mt-1 text-xs text-muted">+ code from editor</p>}
               </li>
             ))}
-            {net === "thinking" && (
+            {liveText != null ? (
+              <li data-streaming="true" className="max-w-[90%] rounded-xl bg-surface-2 px-4 py-3 text-sm leading-6">
+                <p className="mb-1 text-xs font-medium text-muted">{p.personaName}</p>
+                <p className="whitespace-pre-wrap">{liveText}<span aria-hidden className="ml-0.5 inline-block h-3.5 w-[6px] animate-pulse bg-accent align-middle" /></p>
+              </li>
+            ) : net === "thinking" && (
               <li className="flex items-center gap-2 text-sm text-muted"><Loader2 className="size-4 animate-spin" aria-hidden /> {turns.length === 0 ? "The interviewer is joining…" : "Thinking…"}</li>
             )}
           </ol>

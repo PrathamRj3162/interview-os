@@ -1,6 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import { generateObject, type ChatMessage } from "@/lib/ai";
+import { streamChat, splitMeta, spokenFilter, META } from "@/lib/ai/live";
 import { untrusted } from "@/lib/ai/json";
 import { PERSONAS, KINDS, KIND_FOCUS, RUBRICS, DIFFICULTIES, CHARACTERS, TIERS, type KindId, type PersonaId, type Difficulty } from "./config";
 import { pairTurns, communicationStats, type Turn } from "./analysis";
@@ -87,9 +88,8 @@ function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: numb
       ? `- This is the opening: greet the candidate${ctx.name ? ` (${ctx.name.split(" ")[0]})` : ""} in one sentence, explain the round in one sentence, then ask the first question.`
       : "",
     "",
-    dsa
-      ? 'Return JSON: {"say": string, "topic": short label, "is_follow_up": boolean, "advance_phase": boolean, "should_end": boolean}.'
-      : 'Return JSON: {"say": string, "topic": short label of what this question probes, "is_follow_up": boolean, "should_end": boolean}.',
+    // Streamed reply: the spoken text first (so speech can start), then one metadata line.
+    `OUTPUT FORMAT (strict): first write exactly what you say to the candidate as plain spoken text — no JSON, no markdown, no labels. Then, on a final separate line, write ${META} followed by JSON: {"topic": short label of what this probes, "is_follow_up": boolean, ${dsa ? '"advance_phase": boolean, ' : ""}"should_end": boolean}.`,
   ];
   if (dsa) lines.push(dsaSection(iv, dsa));
 
@@ -129,7 +129,13 @@ function workspaceMessage(d: DsaPrompt): ChatMessage {
   };
 }
 
-export async function nextInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa?: DsaPrompt) {
+/**
+ * One interviewer turn, streamed: `onSay` receives the spoken text as it's generated (never the metadata),
+ * so the room can show and speak it immediately. Metadata (topic, should_end, advance_phase) comes at the end.
+ * An optional `nudge` describes something the candidate did (silence, a failed run, a paste) that the
+ * interviewer should react to without waiting for the candidate to speak.
+ */
+export async function streamInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa: DsaPrompt | undefined, onSay: (text: string) => void, nudge?: string) {
   const isFirst = turns.length === 0;
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst, dsa) },
@@ -137,7 +143,12 @@ export async function nextInterviewerTurn(iv: InterviewRow, ctx: CandidateContex
   ];
   if (dsa) messages.push(workspaceMessage(dsa));
   if (isFirst) messages.push({ role: "user", content: "(The candidate has joined. Begin the interview.)" });
-  return generateObject(turnSchema, messages, { temperature: 0.6, maxTokens: 1200 });
+  if (nudge) messages.push({ role: "user", content: `(No message from the candidate — something happened in the room: ${nudge} React to it briefly, the way a real interviewer would: one short question or prompt. ${iv.mode === "mock" ? "Mock mode: a probing question only — never a hint, never the approach." : "Practice mode: a gentle prompt; no full solutions."})` });
+  const r = await streamChat(messages, { temperature: 0.6, maxTokens: 900 }, spokenFilter(onSay));
+  const { say, meta } = splitMeta(r.text);
+  const m = turnSchema.safeParse({ say: say || "Could you say a bit more about that?", ...meta });
+  const data = m.success ? m.data : { say: say || "Could you say a bit more about that?", topic: "", is_follow_up: false, should_end: false, advance_phase: false };
+  return { data, provider: r.provider, model: r.model };
 }
 
 const hintSchema = z.object({ hint: z.string().trim().min(1).max(800) });
@@ -150,7 +161,7 @@ export async function practiceHint(iv: InterviewRow, turns: Turn[]) {
     },
     ...historyMessages(turns),
     { role: "user", content: "(The candidate asked for a hint.)" },
-  ], { temperature: 0.4, maxTokens: 400 });
+  ], { temperature: 0.4, maxTokens: 400, live: true });
 }
 
 // ───────────────────────── Evaluation ─────────────────────────

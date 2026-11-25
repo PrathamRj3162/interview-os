@@ -1,13 +1,12 @@
 import "server-only";
+import { AIUnavailableError, type ChatMessage } from "./errors";
+export { AIUnavailableError, type ChatMessage } from "./errors";
 import type { ZodType } from "zod";
 import { getConfiguredProviders, type ProviderConfig, type ProviderId } from "./providers";
 import { extractJson, UNTRUSTED_GUARD } from "./json";
 import { mockEnabled, mockReply } from "./mock";
+import { liveOrder, LiveTimeoutError, LIVE_FIRST_TOKEN_MS, LIVE_TOTAL_MS } from "./live";
 
-export interface ChatMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
 
 export interface ChatResult {
   text: string;
@@ -15,12 +14,6 @@ export interface ChatResult {
   model: string;
 }
 
-export class AIUnavailableError extends Error {
-  constructor(message = "No AI provider is currently available. Core features without AI still work.") {
-    super(message);
-    this.name = "AIUnavailableError";
-  }
-}
 
 const TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS ?? 45000);
 
@@ -34,7 +27,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 async function callProvider(
   p: ProviderConfig,
   messages: ChatMessage[],
-  opts: { temperature?: number; maxTokens?: number; json?: boolean },
+  opts: { temperature?: number; maxTokens?: number; json?: boolean; timeoutMs?: number },
 ): Promise<string> {
   const res = await fetch(`${p.baseUrl}/chat/completions`, {
     method: "POST",
@@ -49,7 +42,7 @@ async function callProvider(
       max_tokens: opts.maxTokens ?? 2048,
       ...(opts.json && p.id !== "ollama" ? { response_format: { type: "json_object" } } : {}),
     }),
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? TIMEOUT_MS),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -65,19 +58,23 @@ async function callProvider(
 /** Tries each configured provider in order; falls through on errors / rate limits. */
 export async function chat(
   messages: ChatMessage[],
-  opts: { temperature?: number; maxTokens?: number; json?: boolean } = {},
+  opts: { temperature?: number; maxTokens?: number; json?: boolean; live?: boolean } = {},
 ): Promise<ChatResult> {
   if (mockEnabled()) return { text: mockReply(messages), provider: "gemini", model: "mock" };
-  const providers = getConfiguredProviders();
+  // Live calls (hints, nudges, the spoken summary): fast providers first, 8 s per attempt, 15 s overall.
+  const providers = opts.live ? liveOrder(getConfiguredProviders()) : getConfiguredProviders();
+  const deadline = opts.live ? Date.now() + LIVE_TOTAL_MS : Infinity;
   if (providers.length === 0) throw new AIUnavailableError("No AI provider is configured on this server.");
   const guarded: ChatMessage[] = [{ role: "system", content: UNTRUSTED_GUARD }, ...messages];
   const errors: string[] = [];
   for (const p of providers) {
     // Free tiers return 503 "high demand" / 429 in short bursts: one quick retry before falling through.
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt < (opts.live ? 1 : 2); attempt++) {
       const t0 = Date.now();
+      const left = deadline - t0;
+      if (left < 1000) break;
       try {
-        const text = await callProvider(p, guarded, opts);
+        const text = await callProvider(p, guarded, { ...opts, ...(opts.live ? { timeoutMs: Math.min(LIVE_FIRST_TOKEN_MS, left) } : {}) });
         console.info(`[ai] ok ${p.model} ${Date.now() - t0}ms`);
         return { text, provider: p.id, model: p.model };
       } catch (e) {
@@ -90,6 +87,7 @@ export async function chat(
     }
   }
   console.warn("[ai] all providers failed:", errors.join("; "));
+  if (opts.live) throw new LiveTimeoutError();
   throw new AIUnavailableError();
 }
 
@@ -97,7 +95,7 @@ export async function chat(
 export async function generateObject<T>(
   schema: ZodType<T>,
   messages: ChatMessage[],
-  opts: { temperature?: number; maxTokens?: number } = {},
+  opts: { temperature?: number; maxTokens?: number; live?: boolean } = {},
 ): Promise<{ data: T; provider: ProviderId; model: string }> {
   let convo = [...messages];
   let lastError = "";

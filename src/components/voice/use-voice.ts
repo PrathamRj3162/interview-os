@@ -234,8 +234,11 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
   const sources = useRef<AudioBufferSourceNode[]>([]);
   const ttsSupported = typeof window === "undefined" ? true : "speechSynthesis" in window || settings.tts === "kokoro";
 
+  type Utterance = { token: number; t0: number; onDone?: () => void; ended: boolean; outstanding: number; first: boolean; buf: string; engine: "browser" | "kokoro"; chain: Promise<void>; at: number; slow: number };
+  const cur = useRef<Utterance | null>(null);
   const cancel = useCallback(() => {
     playToken.current++;
+    cur.current = null;
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
     for (const s of sources.current) { try { s.stop(); } catch { /* already stopped */ } }
     sources.current = [];
@@ -244,94 +247,128 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
   }, []);
   useEffect(() => { stopTts.current = cancel; }, [cancel]);
 
-  const speakBrowser = useCallback((chunks: string[], token: number, t0: number, onDone?: () => void) => {
-    if (!("speechSynthesis" in window)) { onDone?.(); return; }
-    const voices = window.speechSynthesis.getVoices();
-    const voice = voices.find((v) => v.lang.startsWith("en") && /natural|neural|google|premium|enhanced/i.test(v.name)) ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
-    window.speechSynthesis.cancel();
-    chunks.forEach((c, i) => {
-      const u = new SpeechSynthesisUtterance(c);
-      if (voice) u.voice = voice;
-      if (i === 0) u.onstart = () => { if (token === playToken.current) { setLatency((l) => ({ ...l, ttsMs: Math.round(performance.now() - t0) })); } };
-      if (i === chunks.length - 1) {
-        const done = () => { if (token !== playToken.current) return; ttsSpeaking.current = false; setSpeaking(false); onDone?.(); };
-        u.onend = done; u.onerror = done;
-      }
-      window.speechSynthesis.speak(u);
-    });
-  }, []);
-
   useEffect(() => {
     if (settings.tts !== "kokoro") return;
     setKokoroPct((p) => p ?? 0); // eslint-disable-line react-hooks/set-state-in-effect -- progress of a background download
     loadKokoro((p) => setKokoroPct(p)).then(() => setKokoroPct(100)).catch(() => {});
   }, [settings.tts]);
 
-  const speakKokoro = useCallback(async (input: string[], token: number, t0: number, onDone?: () => void) => {
-    // A shorter first chunk means the first word is heard sooner.
-    const chunks = input[0].length > 80 && /,\s/.test(input[0].slice(20, 120))
-      ? [input[0].slice(0, input[0].indexOf(", ", 20) + 1), input[0].slice(input[0].indexOf(", ", 20) + 2), ...input.slice(1)]
-      : input;
-    try {
-      if (kokoroPct === null) setKokoroPct(0);
-      await loadKokoro((p) => setKokoroPct(p));
-      setKokoroPct(100);
-    } catch {
-      setTtsNote("The natural voice couldn't load (offline or blocked), so the browser voice is used.");
-      setSettings({ tts: "browser" });
-      speakBrowser(chunks, token, t0, onDone);
-      return;
-    }
-    playCtx.current ??= new AudioContext();
-    const ctx = playCtx.current;
-    let at = ctx.currentTime;
-    let first = true;
-    // Generate sentence i+1 while sentence i plays.
-    let next = synthKokoro(chunks[0]);
-    let slow = 0;
-    for (let i = 0; i < chunks.length; i++) {
-      let out: { audio: Float32Array; rate: number };
+  /**
+   * One spoken message, fed incrementally: sentences are queued as soon as they're complete, so speech starts
+   * while the interviewer's reply is still streaming. Browser voices use the native queue; Kokoro synthesises
+   * sentence i+1 while sentence i plays, and hands over to the browser voice if it can't keep up.
+   */
+
+  const maybeDone = useCallback((u: Utterance) => {
+    if (!u.ended || u.outstanding > 0 || u.token !== playToken.current) return;
+    cur.current = null; ttsSpeaking.current = false; setSpeaking(false); sources.current = [];
+    u.onDone?.();
+  }, []);
+  const markFirst = useCallback((u: Utterance) => {
+    if (!u.first || u.token !== playToken.current) return;
+    u.first = false;
+    setLatency((l) => ({ ...l, ttsMs: Math.round(performance.now() - u.t0) }));
+  }, []);
+
+  const enqueueBrowser = useCallback((u: Utterance, chunk: string) => {
+    if (!("speechSynthesis" in window)) return;
+    const voices = window.speechSynthesis.getVoices();
+    const voice = voices.find((v) => v.lang.startsWith("en") && /natural|neural|google|premium|enhanced/i.test(v.name)) ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+    const x = new SpeechSynthesisUtterance(chunk);
+    if (voice) x.voice = voice;
+    u.outstanding++;
+    x.onstart = () => markFirst(u);
+    const done = () => { u.outstanding--; maybeDone(u); };
+    x.onend = done; x.onerror = done;
+    window.speechSynthesis.speak(x);
+  }, [markFirst, maybeDone]);
+
+  const enqueueKokoro = useCallback((u: Utterance, chunk: string) => {
+    u.outstanding++;
+    const synth = synthKokoro(chunk); // starts now: overlaps with what's already playing
+    u.chain = u.chain.then(async () => {
+      if (u.token !== playToken.current) return;
+      if (u.engine === "browser") { u.outstanding--; enqueueBrowser(u, chunk); return; }
       const g0 = performance.now();
-      try { out = await next; } catch { break; }
-      if (token !== playToken.current) return;
-      // Slower than real time twice in a row → this device can't keep up: finish with the browser voice.
+      let out: { audio: Float32Array; rate: number };
+      try { out = await synth; } catch { u.outstanding--; enqueueBrowser(u, chunk); return; }
+      if (u.token !== playToken.current) return;
+      // Slower than real time twice in a row → this device can't keep up: the browser voice takes over.
       const genMs = performance.now() - g0, audioMs = (out.audio.length / out.rate) * 1000;
-      slow = genMs > audioMs * 1.3 && i > 0 ? slow + 1 : 0;
-      if (slow >= 2 && i + 1 < chunks.length) {
+      u.slow = genMs > audioMs * 1.3 && !u.first ? u.slow + 1 : 0;
+      if (u.slow >= 2) {
+        u.engine = "browser";
         setTtsNote("The natural voice is slower than real time on this device, so the browser voice is used from now on. You can switch back in voice settings.");
         setSettings({ tts: "browser" });
-        const rest = chunks.slice(i);
-        const waitMs = Math.max(0, (at - ctx.currentTime) * 1000);
-        window.setTimeout(() => { if (token === playToken.current) speakBrowser(rest, token, t0, onDone); }, waitMs);
-        return;
       }
-      if (i + 1 < chunks.length) next = synthKokoro(chunks[i + 1]);
+      playCtx.current ??= new AudioContext();
+      const ctx = playCtx.current;
       const buffer = ctx.createBuffer(1, out.audio.length, out.rate);
       buffer.copyToChannel(out.audio as Float32Array<ArrayBuffer>, 0);
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(ctx.destination);
-      at = Math.max(at, ctx.currentTime + 0.02);
-      src.start(at);
-      at += buffer.duration;
+      u.at = Math.max(u.at, ctx.currentTime + 0.02);
+      src.start(u.at);
+      u.at += buffer.duration;
       sources.current.push(src);
-      if (first) { first = false; setLatency((l) => ({ ...l, ttsMs: Math.round(performance.now() - t0) })); }
-    }
-    const waitMs = Math.max(0, (at - ctx.currentTime) * 1000);
-    window.setTimeout(() => { if (token !== playToken.current) return; ttsSpeaking.current = false; setSpeaking(false); sources.current = []; onDone?.(); }, waitMs + 50);
-  }, [kokoroPct, setSettings, speakBrowser]);
+      markFirst(u);
+      src.onended = () => { u.outstanding--; maybeDone(u); };
+    });
+  }, [enqueueBrowser, markFirst, maybeDone, setSettings]);
 
-  const speak = useCallback((text: string, onDone?: () => void) => {
-    const chunks = splitSentences(text);
+  const enqueue = useCallback((u: Utterance, chunk: string) => {
+    if (!chunk.trim() || u.token !== playToken.current) return;
+    if (u.engine === "kokoro") enqueueKokoro(u, chunk); else enqueueBrowser(u, chunk);
+  }, [enqueueBrowser, enqueueKokoro]);
+
+  const beginSpeech = useCallback((onDone?: () => void) => {
     cancel();
-    if (!chunks.length) { onDone?.(); return; }
-    const token = ++playToken.current;
-    const t0 = performance.now();
+    const u: Utterance = { token: ++playToken.current, t0: performance.now(), onDone, ended: false, outstanding: 0, first: true, buf: "", engine: settingsRef.current.tts === "kokoro" ? "kokoro" : "browser", chain: Promise.resolve(), at: 0, slow: 0 };
+    if (u.engine === "kokoro") {
+      setKokoroPct((p) => p ?? 0);
+      u.chain = loadKokoro((p) => setKokoroPct(p)).then(() => setKokoroPct(100), () => {
+        u.engine = "browser";
+        setTtsNote("The natural voice couldn't load (offline or blocked), so the browser voice is used.");
+        setSettings({ tts: "browser" });
+      });
+    }
+    cur.current = u;
     ttsSpeaking.current = true;
     setSpeaking(true);
-    if (settingsRef.current.tts === "kokoro") void speakKokoro(chunks, token, t0, onDone);
-    else speakBrowser(chunks, token, t0, onDone);
-  }, [cancel, speakBrowser, speakKokoro]);
+  }, [cancel, setSettings]);
+
+  /** Append streamed text; complete sentences are spoken right away (a long clause is cut at a comma). */
+  const pushSpeech = useCallback((text: string) => {
+    const u = cur.current;
+    if (!u) return;
+    u.buf += text;
+    let cut = -1;
+    const re = /[.!?]["')\]]?\s/g;
+    for (let m = re.exec(u.buf); m; m = re.exec(u.buf)) cut = m.index + m[0].length;
+    if (cut < 0 && u.first && u.buf.length > 140) { const c = u.buf.lastIndexOf(", "); if (c > 40) cut = c + 2; }
+    if (cut < 0) return;
+    const ready = u.buf.slice(0, cut);
+    u.buf = u.buf.slice(cut);
+    for (const chunk of splitSentences(ready, u.first ? 1 : 40)) enqueue(u, chunk);
+  }, [enqueue]);
+
+  const endSpeech = useCallback(() => {
+    const u = cur.current;
+    if (!u) return;
+    for (const chunk of splitSentences(u.buf)) enqueue(u, chunk);
+    u.buf = "";
+    u.ended = true;
+    void u.chain.then(() => maybeDone(u));
+    maybeDone(u);
+  }, [enqueue, maybeDone]);
+
+  const speak = useCallback((text: string, onDone?: () => void) => {
+    if (!splitSentences(text).length) { onDone?.(); return; }
+    beginSpeech(onDone);
+    pushSpeech(text + " ");
+    endSpeech();
+  }, [beginSpeech, pushSpeech, endSpeech]);
 
   const noteAi = useCallback((ms: number) => setLatency((l) => ({ ...l, aiMs: ms })), []);
 
@@ -345,7 +382,7 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
       supported: useWhisper ? true : sr.supported,
       level, userSpeaking, transcribing,
     },
-    tts: { speak, cancel, speaking, supported: ttsSupported, note: ttsNote, kokoroPct },
+    tts: { speak, cancel, speaking, supported: ttsSupported, note: ttsNote, kokoroPct, beginSpeech, pushSpeech, endSpeech },
     sttPct,
     autoSendIn, cancelAutoSend,
   };

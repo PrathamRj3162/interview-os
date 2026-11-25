@@ -78,7 +78,11 @@ test("hardened writes: a user can't forge scores or submissions with their own s
   // Allowed: rating your own interview.
   const rate = await sb.from("mock_interviews").update({ user_rating: 4 }).eq("id", ok.data!.id).select("user_rating").single();
   expect(rate.data?.user_rating).toBe(4);
-  await admin().from("mock_interviews").delete().eq("id", ok.data!.id);
+  // Transcripts are server-only: a user can't add or rewrite turns, even in their own interview.
+  const fakeTurn = await sb.from("interview_turns").insert({ interview_id: ok.data!.id, user_id: userId, role: "candidate", content: "fake brilliant answer" });
+  expect(fakeTurn.error?.code).toBe("42501");
+  const editTurn = await sb.from("interview_turns").update({ content: "rewritten" }).eq("interview_id", ok.data!.id);
+  expect(editTurn.error?.code).toBe("42501");
   // Tasks: users can add their own, but can't mark one as platform-made (only those earn XP).
   const { data: plan } = await admin().from("study_plans").insert({ user_id: userId, inputs: {} }).select("id").single();
   const forgedTask = await sb.from("study_tasks").insert({ plan_id: plan!.id, user_id: userId, due_date: "2026-11-25", kind: "lesson", title: "x", source: "planner" });
@@ -87,6 +91,7 @@ test("hardened writes: a user can't forge scores or submissions with their own s
   expect(own.data?.source).toBe("user");
   const flip = await sb.from("study_tasks").update({ source: "planner" }).eq("id", own.data!.id);
   expect(flip.error?.code).toBe("42501");
+  await admin().from("mock_interviews").delete().eq("id", ok.data!.id);
 });
 
 test("notifications bell, company styles and interviewer characters", async ({ page }) => {

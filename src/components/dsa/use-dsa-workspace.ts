@@ -80,7 +80,14 @@ export function useDsaWorkspace(interviewId: string, init: DsaInit) {
     touch();
   }, [interviewId, touch]);
 
-  const onPaste = useCallback((chars: number) => { if (chars >= 40) queue.current.push({ type: "paste", payload: { chars } }); }, []);
+  // A large paste is something an interviewer reacts to (the room may nudge).
+  const [bigPaste, setBigPaste] = useState<{ n: number; chars: number }>({ n: 0, chars: 0 });
+  const onPaste = useCallback((chars: number) => {
+    if (chars >= 40) queue.current.push({ type: "paste", payload: { chars } });
+    if (chars >= 200) setBigPaste((p) => ({ n: p.n + 1, chars }));
+  }, []);
+  /** Milliseconds since the candidate last typed, ran or spoke in the room. */
+  const idleMs = useCallback(() => Date.now() - lastActivity.current, []);
 
   const switchLanguage = useCallback((to: Lang) => {
     const from = langRef.current;
@@ -164,7 +171,7 @@ export function useDsaWorkspace(interviewId: string, init: DsaInit) {
   return {
     problem, language, code, setCode, switchLanguage, reset, onPaste, touch,
     run, submit, busy, status, outcome, error, clearError: () => setError(null),
-    phase, setPhase, hintsUsed, setHintsUsed, flush, pyReady,
+    phase, setPhase, hintsUsed, setHintsUsed, flush, pyReady, bigPaste, idleMs,
   };
 }
 
