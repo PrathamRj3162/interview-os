@@ -45,4 +45,22 @@ export const STRESS: Record<string, (r: Rng) => unknown[]> = {
   "three-sum": (r) => [r.distinct(3000, -100_000, 100_000)],
   // Insertion sort into a linked list is ~n²/4 pointer hops on random input.
   "sort-list": (r) => [r.arr(100_000, -100_000, 100_000)],
+  // ── extra batches ──
+  "count-primes": () => [5_000_000],
+  "maximum-xor-pair": (r) => [r.arr(100_000, 0, 2147483647)],
+  "subarray-sum-equals-k": (r) => [r.arr(20_000, -1000, 1000), 1_000_000], // no match: brute scans every pair
+  "contiguous-array": () => [Array.from({ length: 100_000 }, (_, i) => (i < 50_000 ? 1 : i % 2))],
+  "subarrays-divisible-by-k": (r) => [r.arr(30_000, -10_000, 10_000), 9973],
+  "continuous-subarray-sum": () => [Array(100_000).fill(1), 2147483647],
+  "flight-bookings": () => [Array.from({ length: 20_000 }, () => [1, 20_000, 10_000]), 20_000],
+  "find-all-anagrams": (r) => [r.str(30_000, "ab"), r.str(15_000, "ab")],
+  "stock-spans": () => [Array.from({ length: 100_000 }, (_, i) => i + 1)], // rising prices: walking back from each day covers everything
+  "dota2-senate": () => ["R".repeat(5000) + "D".repeat(5000)],
+  "count-smaller-after-self": (r) => [r.arr(100_000, -10_000, 10_000)],
+  "reverse-pairs": (r) => [r.arr(50_000, -2147483648, 2147483647)],
+  "longest-increasing-path": () => [Array.from({ length: 200 }, (_, i) => Array.from({ length: 200 }, (_, j) => (i % 2 === 0 ? i * 200 + j : i * 200 + 199 - j)))], // one long snake: plain DFS re-walks it from every cell
+  "jump-game-iv": () => [Array.from({ length: 50_000 }, (_, i) => (i === 49_999 ? 2 : 7))], // one huge equal-value group
+  "longest-valid-parentheses": (r) => [r.str(30_000, "()")],
+  "candy": () => [Array.from({ length: 20_000 }, (_, i) => 20_000 - i)],
+  "max-points-on-line": (r) => [[...new Map(Array.from({ length: 300 }, () => [r.int(-10_000, 10_000), r.int(-10_000, 10_000)]).map((p) => [p.join(","), p])).values()]],
 };

@@ -8,6 +8,7 @@
  */
 import type { Rng } from "./rng";
 import { randomTree, bstFrom } from "./nodes";
+import { EXTRA_SOLUTIONS } from "./extra/solutions";
 
 export type Solution = {
   hints: [string, string, string];
@@ -21,7 +22,7 @@ export type Solution = {
 const sortedDistinct = (r: Rng, n: number, lo: number, hi: number) => r.distinct(n, lo, hi).sort((a, b) => a - b);
 const rotate = <T,>(xs: T[], k: number) => [...xs.slice(k), ...xs.slice(0, k)];
 
-export const SOLUTIONS: Record<string, Solution> = {
+const BASE_SOLUTIONS: Record<string, Solution> = {
   "two-sum": {
     hints: ["For each number, what exact value would complete the pair?", "Looking that value up should take O(1) — which data structure gives you that?", "Walk the array once, keeping a map from value to index; before inserting nums[i], check whether target − nums[i] is already in the map."],
     brute: { time: "O(n²)", idea: "Check every pair i < j." },
@@ -1148,3 +1149,6 @@ export const SOLUTIONS: Record<string, Solution> = {
     gen: (r) => [[[-1]], [[2, -1]], [[-2, -1]], [[1, -2, 3]], [randomTree(r, r.arr(20, -1000, 1000))], [randomTree(r, r.arr(1000, -1000, 1000))], [randomTree(r, r.arr(3000, -1000, 1000), "left")], [randomTree(r, r.arr(30000, -1000, 1000))], [randomTree(r, r.arr(500, -1000, -1))]],
   },
 };
+
+/** Every solution: the original set plus the extra batches. */
+export const SOLUTIONS: Record<string, Solution> = { ...BASE_SOLUTIONS, ...EXTRA_SOLUTIONS };

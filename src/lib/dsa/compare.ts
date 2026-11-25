@@ -40,6 +40,45 @@ export const CHECKERS: Record<string, (input: unknown[], actual: unknown, expect
     if (pos.size !== n || ![...pos.keys()].every((c) => Number.isInteger(c) && c >= 0 && c < (n as number))) return false;
     return (pre as number[][]).every(([a, b]) => pos.get(b)! < pos.get(a)!);
   },
+  "reorganize-string": ([s], out, expected) => {
+    if (typeof out !== "string") return false;
+    if (expected === "") return out === "";
+    const sort = (x: string) => x.split("").sort().join("");
+    if (sort(out) !== sort(s as string)) return false;
+    for (let i = 1; i < out.length; i++) if (out[i] === out[i - 1]) return false;
+    return true;
+  },
+  "alien-dictionary": ([words], out, expected) => {
+    if (typeof out !== "string") return false;
+    if (expected === "") return out === "";
+    const ws = words as string[];
+    const letters = new Set(ws.join(""));
+    if (out.length !== letters.size || new Set(out).size !== out.length || ![...out].every((c) => letters.has(c))) return false;
+    const pos = new Map([...out].map((c, i) => [c, i] as const));
+    for (let i = 0; i + 1 < ws.length; i++) {
+      const a = ws[i], b = ws[i + 1];
+      let k = 0;
+      while (k < a.length && k < b.length && a[k] === b[k]) k++;
+      if (k < a.length && k < b.length && pos.get(a[k])! > pos.get(b[k])!) return false;
+    }
+    return true;
+  },
+  "sudoku-solver": ([board], out) => {
+    const given = board as string[];
+    if (!Array.isArray(out) || out.length !== 9 || !out.every((r) => typeof r === "string" && r.length === 9)) return false;
+    const g = out as string[];
+    for (let i = 0; i < 9; i++) for (let j = 0; j < 9; j++) {
+      if (!/^[1-9]$/.test(g[i][j])) return false;
+      if (given[i][j] !== "." && given[i][j] !== g[i][j]) return false;
+    }
+    for (let k = 0; k < 9; k++) {
+      const row = new Set(g[k]), col = new Set(g.map((r) => r[k]));
+      const box = new Set<string>();
+      for (let x = 0; x < 9; x++) box.add(g[3 * Math.floor(k / 3) + Math.floor(x / 3)][3 * (k % 3) + (x % 3)]);
+      if (row.size !== 9 || col.size !== 9 || box.size !== 9) return false;
+    }
+    return true;
+  },
   "gas-station": ([gas, cost], out, expected) => {
     if (expected === -1) return out === -1;
     const g = gas as number[], c = cost as number[];

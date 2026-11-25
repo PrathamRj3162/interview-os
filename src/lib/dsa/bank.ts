@@ -1,23 +1,13 @@
-import type { CompareMode, Example, Problem, ProblemDifficulty, ValueType } from "./types";
+import type { Problem, ProblemDifficulty } from "./types";
+import { P } from "./define";
+import { EXTRA_PROBLEMS } from "./extra/problems";
 
 /**
  * The problem bank. Statements are written for Interview OS; the problems themselves are classic
  * textbook exercises. Hidden tests, hints and the optimal approach live in ./solutions (server-only).
  */
-function P(
-  slug: string, title: string, difficulty: ProblemDifficulty, topics: string[],
-  signature: string, returns: ValueType, compare: CompareMode,
-  statement: string, constraints: string[], examples: Example[],
-): Problem {
-  const [fn, args] = signature.split("(");
-  const params = args.replace(/\)$/, "").split(",").map((s) => s.trim()).filter(Boolean).map((s) => {
-    const [name, type] = s.split(":").map((x) => x.trim());
-    return { name, type: type as ValueType };
-  });
-  return { slug, title, difficulty, topics, fn, params, returns, compare, statement, constraints, examples };
-}
 
-export const PROBLEMS: Problem[] = [
+const BASE_PROBLEMS: Problem[] = [
   // ───────────── Arrays & hashing ─────────────
   P("two-sum", "Two Sum", "easy", ["Array", "Hash map"], "twoSum(nums: int[], target: int)", "int[]", "checker",
     "Given an integer array `nums` and an integer `target`, return the indices of two different elements whose sum equals `target`.\n\nAt least one valid pair always exists. If there are several, return any one of them, in any order.",
@@ -359,6 +349,9 @@ export const PROBLEMS: Problem[] = [
     ["1 ≤ number of nodes ≤ 3·10⁴", "-1000 ≤ Node.val ≤ 1000"],
     [{ input: [[1, 2, 3]], output: 6, explanation: "2 → 1 → 3." }, { input: [[-10, 9, 20, null, null, 15, 7]], output: 42, explanation: "15 → 20 → 7." }, { input: [[-3]], output: -3 }]),
 ];
+
+/** Every problem: the original set plus the extra batches (lib/dsa/extra). */
+export const PROBLEMS: Problem[] = [...BASE_PROBLEMS, ...EXTRA_PROBLEMS];
 
 export const PROBLEM_BY_SLUG: Record<string, Problem> = Object.fromEntries(PROBLEMS.map((p) => [p.slug, p]));
 
