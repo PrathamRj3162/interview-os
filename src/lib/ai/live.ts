@@ -52,7 +52,8 @@ export async function streamChat(
       const res = await fetch(`${p.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(p.apiKey ? { Authorization: `Bearer ${p.apiKey}` } : {}) },
-        body: JSON.stringify({ model: p.model, messages: guarded, temperature: opts.temperature ?? 0.6, max_tokens: opts.maxTokens ?? 900, stream: true }),
+        // gpt-oss on Groq reasons before speaking: keep it brief for live turns (reasoning arrives in a separate field we ignore).
+        body: JSON.stringify({ model: p.model, messages: guarded, temperature: opts.temperature ?? 0.6, max_tokens: opts.maxTokens ?? 900, stream: true, ...(p.id === "groq" && /gpt-oss/.test(p.model) ? { reasoning_effort: "low" } : {}) }),
         signal: ctrl.signal, cache: "no-store",
       });
       if (!res.ok || !res.body) throw new Error(`${p.id} responded ${res.status}`);
