@@ -71,6 +71,14 @@ export async function runJavaScript(program: string, stdin: string, timeoutMs = 
 
 // Pyodide takes a few seconds (~10 MB download, cached by the browser) to start, so keep one warm worker.
 let py: { worker: Worker; ready: Promise<void> } | null = null;
+let pyIsReady = false;
+const listeners = new Set<(ready: boolean) => void>();
+const setReady = (v: boolean) => { pyIsReady = v; for (const l of listeners) l(v); };
+
+/** True once Pyodide has loaded in this tab. */
+export const pythonReady = () => pyIsReady;
+/** Subscribe to Pyodide readiness (for a small status indicator). Returns an unsubscribe function. */
+export function onPythonReady(cb: (ready: boolean) => void) { listeners.add(cb); return () => { listeners.delete(cb); }; }
 
 function pythonWorker(onStatus?: (s: string) => void) {
   if (py) return py;
@@ -79,14 +87,14 @@ function pythonWorker(onStatus?: (s: string) => void) {
   onStatus?.("Loading Python in your browser (first run downloads about 10 MB)…");
   const ready = new Promise<void>((resolve, reject) => {
     const onMsg = (e: MessageEvent) => {
-      if (e.data?.type === "ready") { worker.removeEventListener("message", onMsg); resolve(); }
+      if (e.data?.type === "ready") { worker.removeEventListener("message", onMsg); setReady(true); resolve(); }
       if (e.data?.type === "load_error") { worker.removeEventListener("message", onMsg); reject(new Error(e.data.message)); }
     };
     worker.addEventListener("message", onMsg);
     worker.onerror = () => reject(new Error("Python runtime failed to load"));
   });
   py = { worker, ready };
-  ready.catch(() => { worker.terminate(); py = null; });
+  ready.catch(() => { worker.terminate(); py = null; setReady(false); });
   return py;
 }
 
@@ -101,15 +109,16 @@ export async function runPython(program: string, stdin: string, opts: { timeoutM
   try {
     await Promise.race([w.ready, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 60_000))]);
   } catch {
-    py?.worker.terminate(); py = null;
+    py?.worker.terminate(); py = null; setReady(false);
     return { status: "unavailable", stdout: "", stderr: "", timeMs: null, message: "Couldn't load the in-browser Python runtime (CDN blocked or offline). Use Submit to run on the server judge instead." };
   }
   opts.onStatus?.("Running…");
   return new Promise<ExecResult>((resolve) => {
     const timer = setTimeout(() => {
       // Pyodide can't be interrupted without cross-origin isolation, so stop the worker; the next run reloads it.
-      w.worker.terminate(); py = null;
-      resolve({ status: "timeout", stdout: "", stderr: "", timeMs: timeoutMs, message: `Stopped after ${timeoutMs / 1000}s — is there an infinite loop? (Python will reload on the next run.)` });
+      w.worker.terminate(); py = null; setReady(false);
+      warmPython(); // start reloading now so the next run doesn't wait
+      resolve({ status: "timeout", stdout: "", stderr: "", timeMs: timeoutMs, message: `Stopped after ${timeoutMs / 1000}s — is there an infinite loop? (Python is reloading in the background.)` });
     }, timeoutMs);
     const onMsg = (e: MessageEvent) => {
       if (e.data?.type !== "result") return;

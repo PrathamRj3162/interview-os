@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { createInterview } from "@/app/actions/interview";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS, type KindId, type PersonaId, 
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
 import { cn } from "@/lib/utils";
 import { PROBLEMS } from "@/lib/dsa/bank";
+import { warmPython } from "@/lib/dsa/browser-runner";
 
 const STEPS = ["Round", "Interviewer", "Details"] as const;
 const option = "cursor-pointer rounded-[var(--radius-md)] border px-4 py-3 text-sm transition-colors duration-[var(--duration-fast)] has-[:focus-visible]:shadow-[var(--focus-glow)]";
@@ -32,6 +33,8 @@ export function SetupForm({ defaults, resumes }: {
   const [company, setCompany] = useState(defaults.company ?? "none");
   const [problem, setProblem] = useState("none");
   const isDsa = kind === "dsa";
+  // DSA round in Python: start downloading the in-browser Python runtime now, so the first Run in the room is instant.
+  useEffect(() => { if (isDsa && (language === "python" || (language === "none" && defaults.language === "python"))) warmPython(); }, [isDsa, language, defaults.language]);
 
   return (
     <form action={action} className="space-y-6">

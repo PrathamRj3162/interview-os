@@ -127,6 +127,11 @@ export function EditorPanel({ ws, disabled }: { ws: DsaWorkspace; disabled?: boo
         </Select>
         <Button size="sm" variant="ghost" onClick={() => setConfirmReset(true)} disabled={Boolean(ws.busy)} aria-label="Reset to starter code" title="Reset to starter code"><RotateCcw className="size-3.5" aria-hidden /><span className="hidden 2xl:inline">Reset</span></Button>
         <span className="ml-auto" />
+        {ws.language === "python" && (
+          <span role="status" data-testid="python-status" className={cn("hidden items-center gap-1 text-[11px] sm:flex", ws.pyReady ? "text-success" : "text-muted")} title={ws.pyReady ? "Python runs in your browser" : "Python is loading in your browser (about 10 MB, cached after the first time). Until then, Run uses the judge."}>
+            {ws.pyReady ? <CheckCircle2 className="size-3" aria-hidden /> : <Loader2 className="size-3 animate-spin" aria-hidden />}{ws.pyReady ? "Py ready" : "Py loading"}
+          </span>
+        )}
         <Button size="sm" variant="secondary" onClick={() => void ws.run()} disabled={disabled || Boolean(ws.busy)} title="Run examples (Ctrl/⌘ + ')">
           {ws.busy === "run" ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Play className="size-3.5" aria-hidden />} Run
         </Button>
@@ -141,7 +146,7 @@ export function EditorPanel({ ws, disabled }: { ws: DsaWorkspace; disabled?: boo
         <Results ws={ws} />
       </div>
       <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted">
-        Autosaved. {remoteRun ? "C++/Java runs and all submissions" : "Submissions"} execute on the free public Judge0 service, so your code is sent to a third party. Python/JS Run stays in your browser.
+        Autosaved. {remoteRun ? "C++/Java runs and all submissions" : "Submissions"} execute on the free public Judge0 service, so your code is sent to a third party. Python/JS Run stays in your browser{ws.language === "python" && !ws.pyReady ? " once Python has loaded (until then Run uses the judge)" : ""}.
       </p>
       <Dialog open={confirmReset} onClose={() => setConfirmReset(false)} title="Reset the editor?"
         footer={<><Button variant="ghost" onClick={() => setConfirmReset(false)}>Cancel</Button><Button variant="danger" onClick={() => { ws.reset(); setConfirmReset(false); }}>Reset to starter code</Button></>}>

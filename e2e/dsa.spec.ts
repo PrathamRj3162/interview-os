@@ -113,8 +113,13 @@ test("DSA round: Python runs in the browser (Pyodide); C++ runs on the judge; mo
 
   await typeCode(page, "class Solution:\n    def isValid(self, s: str) -> bool:\n        st = []\n        pairs = {')': '(', ']': '[', '}': '{'}\n        for c in s:\n            if c in pairs:\n                if not st or st.pop() != pairs[c]:\n                    return False\n            else:\n                st.append(c)\n        return not st\n");
   await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(page.getByText("Examples passed")).toBeVisible({ timeout: 90_000 }); // first run downloads Pyodide
-  await expect(page.getByText(/4\/4 passed · run · in browser/)).toBeVisible();
+  // While Pyodide (~10 MB) is still loading, Run falls back to the judge instead of making you wait.
+  await expect(page.getByText("Examples passed")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText(/4\/4 passed · run · (in browser|Judge0)/)).toBeVisible();
+  // Once loaded, Run stays in the browser.
+  await expect(page.getByTestId("python-status")).toHaveText("Py ready", { timeout: 90_000 });
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.getByText(/4\/4 passed · run · in browser/)).toBeVisible({ timeout: 30_000 });
 
   // A syntax error is reported against the candidate's own line numbers.
   await typeCode(page, "class Solution:\n    def isValid(self, s: str) -> bool\n        return True\n");

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildProgram, encodeStdin, makeNonce, starterCode, codeLineOffset, fixLineNumbers } from "@/lib/dsa/harness";
 import { grade } from "@/lib/dsa/grade";
-import { runJavaScript, runPython, warmPython } from "@/lib/dsa/browser-runner";
+import { runJavaScript, runPython, warmPython, pythonReady, onPythonReady } from "@/lib/dsa/browser-runner";
 import type { Lang, Problem, RunOutcome } from "@/lib/dsa/types";
 import type { Phase } from "@/lib/dsa/phases";
 
@@ -30,6 +30,8 @@ export function useDsaWorkspace(interviewId: string, init: DsaInit) {
   const [error, setError] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>(init.phase);
   const [hintsUsed, setHintsUsed] = useState(init.hintsUsed);
+  const [pyReady, setPyReady] = useState(false);
+  useEffect(() => { setPyReady(pythonReady()); return onPythonReady(setPyReady); }, []); // eslint-disable-line react-hooks/set-state-in-effect -- sync with module state
 
   const queue = useRef<QueuedEvent[]>([]);
   const lastActivity = useRef(0);
@@ -117,10 +119,18 @@ export function useDsaWorkspace(interviewId: string, init: DsaInit) {
     if (busy) return;
     touch();
     const lang = langRef.current;
-    setBusy("run"); setError(null); setStatus(lang === "cpp" || lang === "java" ? "Compiling and running on the judge (usually 5–15 s)…" : "Running in your browser…");
+    // Python still loading in the browser (first visit downloads ~10 MB): run this one on the judge instead of waiting.
+    const viaJudge = lang === "cpp" || lang === "java" || (lang === "python" && !pythonReady());
+    setBusy("run"); setError(null);
+    setStatus(lang === "python" && viaJudge ? "Python is still loading in your browser, so this run goes to the judge (5–15 s)…" : viaJudge ? "Compiling and running on the judge (usually 5–15 s)…" : "Running in your browser…");
+    if (lang === "python") warmPython();
     try {
-      let o: RunOutcome;
-      if (lang === "python" || lang === "javascript") {
+      let o: RunOutcome | null = null;
+      if (viaJudge && lang === "python") {
+        try { o = await remote("run"); } catch { setStatus("The judge is busy; waiting for Python to finish loading in your browser…"); }
+      }
+      if (o) { /* ran on the judge */ }
+      else if (lang === "python" || lang === "javascript") {
         const cases = problem.examples.map((e) => ({ input: e.input, expected: e.output, hidden: false }));
         const nonce = makeNonce();
         const program = buildProgram(lang, problem, codeRef.current, nonce);
@@ -154,7 +164,7 @@ export function useDsaWorkspace(interviewId: string, init: DsaInit) {
   return {
     problem, language, code, setCode, switchLanguage, reset, onPaste, touch,
     run, submit, busy, status, outcome, error, clearError: () => setError(null),
-    phase, setPhase, hintsUsed, setHintsUsed, flush,
+    phase, setPhase, hintsUsed, setHintsUsed, flush, pyReady,
   };
 }
 
