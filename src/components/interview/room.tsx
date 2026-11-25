@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, Volume2, VolumeX, Pause, Play, Square, Send, Lightbulb, RotateCcw, Code2, Loader2, Keyboard, Maximize2, Minimize2 } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, Pause, Play, Square, Send, Lightbulb, RotateCcw, Code2, Loader2, Keyboard, Maximize2, Minimize2, SlidersHorizontal, Gauge } from "lucide-react";
+import Link from "next/link";
 import { Dialog } from "@/components/ui/interactive";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useSpeechRecognition, useSpeechSynthesis } from "./use-speech";
+import { useVoice } from "@/components/voice/use-voice";
+import { VoiceSettingsDialog, LevelMeter } from "@/components/voice/voice-ui";
 import { useDsaWorkspace, type DsaInit, type DsaWorkspace } from "@/components/dsa/use-dsa-workspace";
 import { ProblemPanel, EditorPanel, PhaseStepper, SplitPanes } from "@/components/dsa/panels";
 import type { Phase } from "@/lib/dsa/phases";
@@ -26,6 +28,8 @@ export type RoomProps = {
   initialTurns: Turn[];
   /** Present for the DSA live-coding round. */
   dsa?: DsaInit;
+  /** Server speech-to-text (Whisper on Groq) is configured. */
+  sttServer?: boolean;
 };
 
 type Net = "idle" | "thinking" | "error";
@@ -64,10 +68,16 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const listRef = useRef<HTMLOListElement>(null);
   const spokenRef = useRef<number>(p.initialTurns.at(-1)?.id ?? 0);
 
-  const tts = useSpeechSynthesis();
-  const mic = useSpeechRecognition(useCallback((text: string) => {
-    if (text) { setDraft((d) => (d ? d.trimEnd() + " " : "") + text); wsRef.current?.touch(); }
-  }, []));
+  const sendRef = useRef<() => void>(() => {});
+  const voice = useVoice({
+    sttServer: Boolean(p.sttServer), enabled: true,
+    onText: useCallback((text: string) => {
+      if (text) { setDraft((d) => (d ? d.trimEnd() + " " : "") + text); wsRef.current?.touch(); }
+    }, []),
+    onAutoSend: useCallback(() => sendRef.current(), []),
+  });
+  const { mic, tts } = voice;
+  const [showVoice, setShowVoice] = useState(false);
 
   // Clock
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -78,11 +88,14 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   // Keep transcript scrolled to latest
   useEffect(() => { listRef.current?.lastElementChild?.scrollIntoView({ block: "end", behavior: "smooth" }); }, [turns, net]);
 
+  const noteAi = voice.noteAi;
   const post = useCallback(async (body: object) => {
     setNet("thinking"); setError(null); setRetryable(false);
     try {
+      const t0 = Date.now();
       const res = await fetch(`/api/interview/${p.id}/turn`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
+      if (res.ok) noteAi(Date.now() - t0);
       if (data.turns) setTurns(data.turns);
       if (data.phase) wsRef.current?.setPhase(data.phase as Phase);
       if (typeof data.hintsUsed === "number") wsRef.current?.setHintsUsed(data.hintsUsed);
@@ -97,7 +110,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
       setNet("error"); setError("Connection lost. Check your network — your answer will be resent when you press Retry."); setRetryable(true);
       return false;
     }
-  }, [p.id]);
+  }, [p.id, noteAi]);
 
   // Open the interview (idempotent on reload)
   const startedRef = useRef(false);
@@ -114,16 +127,18 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
     spokenRef.current = last.id;
     if (paused) return;
     if (voiceOut && tts.supported) {
-      tts.speak(last.content, () => { if (autoListen && mic.supported) mic.start(); });
+      // Voice mode: watch the mic while the interviewer talks so speaking up interrupts it (nothing is recorded).
+      if (p.inputMode === "voice" && voice.settings.bargeIn && mic.supported) mic.monitor();
+      tts.speak(last.content, () => { if (autoListen && mic.supported) mic.start(); else if (mic.state !== "listening") mic.stop(); });
     } else if (autoListen && mic.supported && p.inputMode === "voice") {
       mic.start();
     }
-  }, [last, voiceOut, autoListen, paused, tts, mic, p.inputMode]);
+  }, [last, voiceOut, autoListen, paused, tts, mic, p.inputMode, voice.settings.bargeIn]);
 
   const send = async () => {
     const content = (draft + (mic.interim ? " " + mic.interim : "")).trim();
     if (!content || net === "thinking") return;
-    mic.stop(); tts.cancel();
+    mic.stop(); tts.cancel(); voice.cancelAutoSend();
     setDraft("");
     let ok: boolean;
     if (ws) {
@@ -135,6 +150,8 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
     }
     if (!ok && !turns.some((t) => t.role === "candidate" && t.content === content)) setDraft(content);
   };
+
+  useEffect(() => { sendRef.current = () => { void send(); }; });
 
   const retry = () => {
     const lastCandidate = [...turns].reverse().find((t) => t.role === "candidate");
@@ -213,6 +230,13 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
           {mic.state === "listening" ? <Mic className="size-3.5" aria-hidden /> : <MicOff className="size-3.5" aria-hidden />}
           <span className="hidden sm:inline">{mic.state === "listening" ? "Mic live" : mic.state === "denied" ? "Mic blocked" : mic.state === "unsupported" ? "No mic support" : "Mic off"}</span>
         </span>
+        {p.inputMode === "voice" && (voice.latency.aiMs != null || voice.latency.sttMs != null || voice.latency.ttsMs != null) && (
+          <span className="hidden items-center gap-1 font-mono text-[11px] text-muted md:flex" title="Measured on this device: speech-to-text after you stop talking, the interviewer's reply, and time to the first spoken word" data-testid="latency">
+            <Gauge className="size-3.5" aria-hidden />
+            {[["STT", voice.latency.sttMs], ["AI", voice.latency.aiMs], ["Voice", voice.latency.ttsMs]].filter(([, v]) => v != null).map(([k, v]) => `${k} ${((v as number) / 1000).toFixed(1)}s`).join(" · ")}
+          </span>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => setShowVoice(true)} aria-label="Voice settings"><SlidersHorizontal className="size-4" aria-hidden /></Button>
         <Button size="sm" variant="ghost" onClick={() => setShowKeys(true)} aria-label="Keyboard shortcuts" className="hidden sm:inline-flex"><Keyboard className="size-4" aria-hidden /></Button>
         <Button size="sm" variant="ghost" onClick={() => setFocusMode(!focusMode)} aria-pressed={focusMode} aria-label={focusMode ? "Exit focus mode" : "Focus mode"}>
           {focusMode ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
@@ -258,8 +282,18 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
           placeholder={mic.state === "listening" ? "Listening… speak your answer. You can edit the text before sending." : "Type your answer (Ctrl/⌘ + Enter to send)"}
           className="w-full resize-none bg-transparent text-sm leading-6 focus:outline-none disabled:opacity-50"
         />
+        {voice.autoSendIn != null && (
+          <div role="status" className="mt-1 flex items-center gap-2 rounded-md bg-accent-soft px-2 py-1 text-xs" data-testid="auto-send">
+            <span>Sending in {voice.autoSendIn.toFixed(1)}s — keep talking to continue</span>
+            <button type="button" onClick={voice.cancelAutoSend} className="ml-auto font-medium text-accent underline">Don&apos;t send</button>
+          </div>
+        )}
+        {mic.transcribing && <p role="status" className="mt-1 text-xs text-muted">Transcribing…</p>}
+        {tts.kokoroPct != null && tts.kokoroPct < 100 && <p role="status" className="mt-1 text-xs text-muted">Loading the natural voice on your device… {tts.kokoroPct}% (one-time download, about 90 MB)</p>}
+        {tts.note && <p className="mt-1 text-xs text-warning">{tts.note}</p>}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {mic.supported ? (
+            <>
             <Button
               size="sm" variant={mic.state === "listening" ? "primary" : "secondary"} disabled={paused || mic.state === "denied"}
               onClick={() => (mic.state === "listening" ? mic.stop() : mic.start())}
@@ -268,6 +302,8 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
               {mic.state === "listening" ? <Mic className="size-4" aria-hidden /> : <MicOff className="size-4" aria-hidden />}
               {mic.state === "listening" ? "Mic on" : mic.state === "denied" ? "Mic blocked" : "Mic off"}
             </Button>
+            {mic.state === "listening" && <LevelMeter level={mic.level} active={mic.userSpeaking} />}
+            </>
           ) : p.inputMode === "voice" ? (
             <span className="text-xs text-muted">Voice input isn&apos;t supported in this browser (try Chrome, Edge or Safari) — type instead.</span>
           ) : null}
@@ -301,10 +337,15 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
           </div>
         </div>
         {p.inputMode === "voice" && (
-          <p className="mt-2 text-[11px] text-muted">Turn-based voice using your browser&apos;s speech recognition and text-to-speech — not a real-time voice model. InterviewOS stores only the text transcript, never audio.</p>
+          <p className="mt-2 text-[11px] text-muted">
+            {voice.settings.stt === "whisper" && p.sttServer ? "Listening with Whisper: each answer's audio is sent to Groq for transcription and not stored by Interview OS." : "Listening with your browser's speech recognition (in Chrome, Google's speech service)."}{" "}
+            {voice.settings.tts === "kokoro" ? "The interviewer's natural voice runs on your device." : "The interviewer uses your browser's voice."}{" "}
+            {voice.settings.autoSend ? "Your answer sends after a pause (you can cancel)." : "Press Send when you're done."} Interview OS stores only the text transcript. <Link href="/mic-check" className="underline" target="_blank">Mic check</Link>
+          </p>
         )}
       </div>
   );
+  const voiceDialog = <VoiceSettingsDialog open={showVoice} onClose={() => setShowVoice(false)} voice={voice} />;
   const keysDialog = (
       <Dialog open={showKeys} onClose={() => setShowKeys(false)} title="Keyboard shortcuts">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
@@ -332,6 +373,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
           ) },
         ]} />
         {keysDialog}
+        {voiceDialog}
       </div>
     );
   }
@@ -361,6 +403,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
       {errorsEl}
       {composerEl}
       {keysDialog}
+      {voiceDialog}
     </div>
   );
 }

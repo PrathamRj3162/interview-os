@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.0 — 2026-11-25 · Voice v2
+- On-device voice activity detection (`lib/voice/vad.ts`): adaptive noise floor, hysteresis, ignores clicks; a stricter mode while the interviewer talks so speaker echo doesn't count.
+- Auto-send after you stop talking, with a visible 1.5 s countdown you can cancel by talking or pressing "Don't send"; adjustable pause length (0.8–3 s).
+- Barge-in: while the interviewer speaks the mic only monitors (nothing recorded or transcribed); speaking up stops the voice and starts listening.
+- Interviewer speech is streamed sentence by sentence (`lib/voice/sentences.ts`), so it starts sooner and stops cleanly.
+- Optional natural voice: Kokoro-82M running entirely in the browser (module worker, WebGPU when available, otherwise WASM; ~90 MB one-time download), with automatic fallback to the browser voice.
+- Optional Whisper speech-to-text via Groq's free tier, only when `GROQ_API_KEY` is configured (`/api/voice/stt`; counts toward the daily AI limit). Otherwise the engine is shown as unavailable, not hidden.
+- Latency readout in the room (speech-to-text, interviewer reply, time to first spoken word), measured on the device.
+- Mic check page: device picker, live level and noise floor with advice, pause detection indicator, 5 s record and playback (stays in the tab), recognition test, both voices with timing.
+- Fix: dialogs now get unique title ids, so a second dialog on the page announces the right name.
+
 ## 0.6.0 — 2026-11-25 · Progress, tiers and achievements
 - XP computed on the fly from recorded activity (no stored, editable XP number), `lib/progress/xp.ts`: interview = score × difficulty multiplier (needs 3+ answers); problems Easy 20 / Medium 40 / Hard 80 on the first accepted solve, ×0.5 with 2+ hints, +10 for a first-try accept; tasks +10 (max 30/day); streak +5 × min(streak, 10) per active day. Days use IST.
 - Levels at 150·k^1.6 XP; 7 tiers (Intern → Junior → SDE-1 → SDE-2 → Senior → Staff → Principal) × divisions III–I, with original hexagon emblems and taglines (Gen-Z or neutral, following the Vibe setting).

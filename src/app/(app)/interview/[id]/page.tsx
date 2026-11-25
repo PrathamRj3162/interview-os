@@ -6,6 +6,7 @@ import { loadInterview, loadTurns } from "@/lib/interview/server";
 import { KINDS, PERSONAS } from "@/lib/interview/config";
 import { dsaContextFor, loadEvents, asPhase, initialWorkspace, type Workspace } from "@/lib/dsa/server";
 import { STRESS } from "@/lib/dsa/stress";
+import { sttAvailable } from "@/lib/voice/server";
 
 export const metadata: Metadata = { title: "Interview" };
 
@@ -30,6 +31,7 @@ export default async function InterviewRoomPage({ params }: { params: Promise<{ 
       personaName={PERSONAS[iv.persona]?.name ?? "Interviewer"}
       mode={iv.mode}
       inputMode={iv.input_mode === "voice" ? "voice" : "text"}
+      sttServer={sttAvailable()}
       coding={KINDS[iv.kind]?.coding ?? false}
       durationMin={iv.duration_min}
       startedAt={iv.started_at}

@@ -110,12 +110,13 @@ export function SetupForm({ defaults, resumes }: {
               {DURATIONS.map((d) => <option key={d} value={d}>{d} minutes</option>)}
             </Select>
           </Field>
-          <Field label="Answer by" htmlFor="input_mode">
+          <Field label="Answer by" htmlFor="input_mode" hint={input === "voice" ? "Pause detection sends your answer when you stop talking (cancellable). Test your setup first in the mic check (opens in a new tab)." : undefined}>
             <Select id="input_mode" name="input_mode" value={input} onChange={(e) => setInput(e.target.value as "text" | "voice")}>
-              <option value="voice">Voice (browser speech)</option>
+              <option value="voice">Voice</option>
               <option value="text">Typing</option>
             </Select>
           </Field>
+          {input === "voice" && <p className="-mt-2 text-xs"><a href="/mic-check" target="_blank" rel="noopener" className="text-accent underline">Open the mic check</a></p>}
           <Field label="Resume context" htmlFor="resume_id" hint={resumes.length ? "Claims from this resume steer the questions." : "Upload a resume for resume-aware questions."}>
             <Select id="resume_id" name="resume_id" value={resumeId} onChange={(e) => setResumeId(e.target.value)}>
               <option value="none">Don&apos;t use a resume</option>

@@ -7,6 +7,7 @@
 - AI: keys server-only; untrusted content delimited; outputs schema-validated; no prompt/response bodies logged.
 - Code execution (Phase 3): never on the server; sandboxed iframe without `allow-same-origin` + worker with timeouts.
 - Data: account deletion removes rows (cascade) and storage files. No audio stored.
+- Voice: level metering and pause detection run on the device (Web Audio). With browser recognition, audio goes to the browser's speech service (Google in Chrome). With Whisper (only if `GROQ_API_KEY` is set and the user picks it), each answer's audio is posted to `/api/voice/stt` (auth, 4 MB cap, type check, daily AI quota) and forwarded to Groq; it is never stored. The optional natural voice (Kokoro) runs in a browser worker: the library loads from jsDelivr and the model from Hugging Face; text never leaves the device. Mic-check recordings stay in the tab.
 
 ## Running candidate code (DSA round)
 

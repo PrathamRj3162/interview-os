@@ -20,13 +20,13 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | **Resume intelligence**: PDF/DOCX upload, a 0–100 score where every point is explained, unsupported-skill and missing-keyword detection | ✅ |
 | AI resume claims: questions for every claim, risk flags, bullet rewrites (quotes are verified against your resume word for word) | ✅ |
 | **Mock interviews**: 9 personas × 10 round types × 5 difficulties, mock vs practice (hints), code panel | ✅ |
-| Voice mode (browser speech recognition + speech synthesis, turn-based, barge-in, text fallback) | ✅ |
+| **Voice v2**: pause detection (on-device VAD) with a cancellable auto-send, barge-in, sentence-streamed speech, optional on-device natural voice (Kokoro-82M), optional Whisper via Groq when a key is set, per-stage latency, mic check page; text fallback | ✅ |
 | **Reports (v2)**: anchored 1–4 rubric, timestamped quotes checked against your transcript, judge-backed correctness for coding, a rule-based verdict (No Hire → Strong Hire) shown step by step, the one thing to fix, 3 drills, measured metrics (reply time, talk share, coding timeline), annotated final code, per-question feedback | ✅ |
 | Dashboard: today's tasks from report drills, data-driven next step | ✅ |
 | **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 79 problems (incl. linked lists and trees) with hidden tests and timed worst-case stress tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
 | Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
 | **Progress & XP**: XP from interviews, solves, tasks and streaks (published formula), levels, 7 tiers × 3 divisions, decay with a tier floor, 18 dated achievements, personal bests, weekly recap, 30-day XP chart, mistake notebook | ✅ |
-| Voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
+| CS fundamentals academy, system design lab | 🚧 planned |
 
 ## Tech stack
 

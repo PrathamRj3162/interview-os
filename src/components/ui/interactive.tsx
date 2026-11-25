@@ -38,6 +38,7 @@ export function Tabs({ tabs, initial = 0, label }: { tabs: { label: string; cont
 /** Modal dialog built on <dialog>: native focus trap, Esc to close, backdrop click closes. */
 export function Dialog({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId(); // unique per dialog: several can exist on one page
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
@@ -46,12 +47,12 @@ export function Dialog({ open, onClose, title, children, footer }: { open: boole
   }, [open]);
   return (
     <dialog
-      ref={ref} onClose={onClose} aria-labelledby="dialog-title"
+      ref={ref} onClose={onClose} aria-labelledby={titleId}
       onClick={(e) => { if (e.target === ref.current) onClose(); }}
       className="m-auto w-[min(32rem,calc(100vw-2rem))] rounded-[var(--radius-xl)] border border-border bg-surface p-0 text-text shadow-2xl backdrop:bg-black/60 backdrop:backdrop-blur-sm"
     >
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h2 id="dialog-title" className="font-semibold">{title}</h2>
+        <h2 id={titleId} className="font-semibold">{title}</h2>
         <button onClick={onClose} className="grid size-8 place-items-center rounded-[var(--radius-sm)] text-muted hover:bg-surface-2 hover:text-text" aria-label="Close">
           <X className="size-4" />
         </button>
