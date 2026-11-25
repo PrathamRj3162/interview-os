@@ -113,8 +113,10 @@ test("project deep-dive: add a repo, analyse it, practise", async ({ page }) => 
   await page.getByRole("button", { name: "Add project" }).click();
   await expect(page.getByText("Project added.")).toBeVisible();
   await page.getByRole("button", { name: "Analyse repository" }).click();
-  await expect(page.getByText(/Analysed PrathamRj3162\/interview-os|GitHub's free API limit/)).toBeVisible({ timeout: 45_000 });
-  if (await page.getByText(/Analysed/).isVisible()) {
+  // On success the button (and its message) is replaced by a "likely questions" link, sometimes before the message is seen.
+  const analysed = page.getByRole("link", { name: /likely questions/ });
+  await expect(analysed.or(page.getByText(/GitHub's free API limit/))).toBeVisible({ timeout: 45_000 });
+  if (await analysed.isVisible()) {
     await page.getByRole("link", { name: /likely questions/ }).click();
     await expect(page.getByTestId("project-analysis")).toContainText("TypeScript");
   }
