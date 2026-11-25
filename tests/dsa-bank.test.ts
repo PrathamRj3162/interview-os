@@ -12,6 +12,7 @@ import { testsFor } from "@/lib/dsa/tests";
 import { outputsMatch } from "@/lib/dsa/compare";
 import { buildProgram, encodeStdin, makeNonce } from "@/lib/dsa/harness";
 import { grade } from "@/lib/dsa/grade";
+import { callRef } from "@/lib/dsa/nodes";
 
 const dir = mkdtempSync(path.join(tmpdir(), "ios-dsa-"));
 
@@ -31,7 +32,7 @@ describe("problem bank", () => {
   it.each(PROBLEMS.map((p) => [p.slug]))("%s: every statement example agrees with the reference solution", (slug) => {
     const p = PROBLEMS.find((x) => x.slug === slug)!;
     for (const e of p.examples) {
-      const got = SOLUTIONS[slug].ref(...structuredClone(e.input));
+      const got = callRef(p, SOLUTIONS[slug].ref, e.input);
       expect(outputsMatch(p.compare, e.output, got, { slug, input: e.input }), `${slug} ${JSON.stringify(e.input)} → ${JSON.stringify(got)}`).toBe(true);
     }
   });

@@ -84,6 +84,37 @@ const SOLS: Record<string, Partial<Record<Lang, string>>> = {
     python: "class Solution:\n    def minWindow(self, s: str, t: str) -> str:\n        need = Counter(t); missing = len(t); l = 0; best = (0, float('inf'))\n        for r, c in enumerate(s):\n            if need[c] > 0: missing -= 1\n            need[c] -= 1\n            while missing == 0:\n                if r - l + 1 < best[1] - best[0]: best = (l, r + 1)\n                need[s[l]] += 1\n                if need[s[l]] > 0: missing += 1\n                l += 1\n        return '' if best[1] == float('inf') else s[best[0]:best[1]]\n",
     java: "class Solution {\n    public String minWindow(String s, String t) {\n        int[] need = new int[128]; for (char c : t.toCharArray()) need[c]++;\n        int missing = t.length(), l = 0, bs = 0, bl = Integer.MAX_VALUE;\n        for (int r = 0; r < s.length(); r++) { if (need[s.charAt(r)]-- > 0) missing--;\n            while (missing == 0) { if (r - l + 1 < bl) { bl = r - l + 1; bs = l; } if (++need[s.charAt(l++)] > 0) missing++; } }\n        return bl == Integer.MAX_VALUE ? \"\" : s.substring(bs, bs + bl);\n    }\n}\n",
   },
+  // Linked lists and trees: conversions in and out of every language.
+  "reverse-linked-list": {
+    python: "class Solution:\n    def reverseList(self, head: Optional[ListNode]) -> Optional[ListNode]:\n        prev = None\n        while head:\n            head.next, prev, head = prev, head, head.next\n        return prev\n",
+    cpp: "class Solution {\npublic:\n    ListNode* reverseList(ListNode* head) {\n        ListNode* prev = nullptr;\n        while (head) { ListNode* n = head->next; head->next = prev; prev = head; head = n; }\n        return prev;\n    }\n};\n",
+    java: "class Solution {\n    public ListNode reverseList(ListNode head) {\n        ListNode prev = null;\n        while (head != null) { ListNode n = head.next; head.next = prev; prev = head; head = n; }\n        return prev;\n    }\n}\n",
+    // The candidate defines their own ListNode class and builds new nodes: must not clash with the runner's.
+    javascript: "class ListNode { constructor(val, next) { this.val = val ?? 0; this.next = next ?? null; } }\nfunction reverseList(head) {\n  let out = null;\n  for (let n = head; n; n = n.next) out = new ListNode(n.val, out);\n  return out;\n}\n",
+  },
+  "add-two-numbers": {
+    python: "class Solution:\n    def addTwoNumbers(self, l1, l2):\n        d = t = ListNode()\n        c = 0\n        while l1 or l2 or c:\n            s = (l1.val if l1 else 0) + (l2.val if l2 else 0) + c\n            c, v = divmod(s, 10)\n            t.next = ListNode(v); t = t.next\n            l1 = l1.next if l1 else None\n            l2 = l2.next if l2 else None\n        return d.next\n",
+  },
+  "build-tree-preorder-inorder": {
+    python: "class Solution:\n    def buildTree(self, preorder: List[int], inorder: List[int]) -> Optional[TreeNode]:\n        idx = {v: i for i, v in enumerate(inorder)}\n        it = iter(preorder)\n        def go(lo, hi):\n            if lo > hi:\n                return None\n            v = next(it)\n            n = TreeNode(v)\n            n.left = go(lo, idx[v] - 1)\n            n.right = go(idx[v] + 1, hi)\n            return n\n        return go(0, len(inorder) - 1)\n",
+    cpp: "class Solution {\n    unordered_map<int,int> idx; int p = 0;\n    TreeNode* go(vector<int>& pre, int lo, int hi) {\n        if (lo > hi) return nullptr;\n        int v = pre[p++]; TreeNode* n = new TreeNode(v);\n        n->left = go(pre, lo, idx[v] - 1); n->right = go(pre, idx[v] + 1, hi);\n        return n;\n    }\npublic:\n    TreeNode* buildTree(vector<int>& preorder, vector<int>& inorder) {\n        for (int i = 0; i < (int)inorder.size(); i++) idx[inorder[i]] = i;\n        return go(preorder, 0, (int)inorder.size() - 1);\n    }\n};\n",
+    java: "class Solution {\n    Map<Integer,Integer> idx = new HashMap<>(); int p = 0;\n    TreeNode go(int[] pre, int lo, int hi) {\n        if (lo > hi) return null;\n        int v = pre[p++]; TreeNode n = new TreeNode(v);\n        n.left = go(pre, lo, idx.get(v) - 1); n.right = go(pre, idx.get(v) + 1, hi);\n        return n;\n    }\n    public TreeNode buildTree(int[] preorder, int[] inorder) {\n        for (int i = 0; i < inorder.length; i++) idx.put(inorder[i], i);\n        return go(preorder, 0, inorder.length - 1);\n    }\n}\n",
+  },
+  "level-order-traversal": {
+    cpp: "class Solution {\npublic:\n    vector<vector<int>> levelOrder(TreeNode* root) {\n        vector<vector<int>> out; if (!root) return out;\n        queue<TreeNode*> q; q.push(root);\n        while (!q.empty()) {\n            int n = q.size(); out.push_back({});\n            while (n--) { auto x = q.front(); q.pop(); out.back().push_back(x->val); if (x->left) q.push(x->left); if (x->right) q.push(x->right); }\n        }\n        return out;\n    }\n};\n",
+  },
+  "same-tree": {
+    java: "class Solution {\n    public boolean isSameTree(TreeNode p, TreeNode q) {\n        if (p == null || q == null) return p == q;\n        return p.val == q.val && isSameTree(p.left, q.left) && isSameTree(p.right, q.right);\n    }\n}\n",
+  },
+  "lca-bst": {
+    java: "class Solution {\n    public int lowestCommonAncestor(TreeNode root, int p, int q) {\n        while (true) {\n            if (p < root.val && q < root.val) root = root.left;\n            else if (p > root.val && q > root.val) root = root.right;\n            else return root.val;\n        }\n    }\n}\n",
+  },
+  "max-path-sum": {
+    cpp: "class Solution {\n    int best = INT_MIN;\n    int gain(TreeNode* n) {\n        if (!n) return 0;\n        int a = max(0, gain(n->left)), b = max(0, gain(n->right));\n        best = max(best, n->val + a + b);\n        return n->val + max(a, b);\n    }\npublic:\n    int maxPathSum(TreeNode* root) { gain(root); return best; }\n};\n",
+  },
+  "invert-binary-tree": {
+    python: "class Solution:\n    def invertTree(self, root):\n        if root:\n            root.left, root.right = self.invertTree(root.right), self.invertTree(root.left)\n        return root\n",
+  },
 };
 
 const cases = Object.entries(SOLS).flatMap(([slug, by]) => (Object.entries(by) as [Lang, string][]).map(([lang, code]) => [lang, slug, code] as const));

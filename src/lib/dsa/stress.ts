@@ -43,4 +43,6 @@ export const STRESS: Record<string, (r: Rng) => unknown[]> = {
   // Big jumps everywhere: marking every reachable index from every i is ~n² work.
   "jump-game": () => [Array(100_000).fill(100_000)],
   "three-sum": (r) => [r.distinct(3000, -100_000, 100_000)],
+  // Insertion sort into a linked list is ~n²/4 pointer hops on random input.
+  "sort-list": (r) => [r.arr(100_000, -100_000, 100_000)],
 };

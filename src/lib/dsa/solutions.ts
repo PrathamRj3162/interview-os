@@ -7,6 +7,7 @@
  * runs it through the real JavaScript harness to check the whole pipeline end to end.
  */
 import type { Rng } from "./rng";
+import { randomTree, bstFrom } from "./nodes";
 
 export type Solution = {
   hints: [string, string, string];
@@ -831,5 +832,319 @@ export const SOLUTIONS: Record<string, Solution> = {
     optimal: { time: "O(n²)", space: "O(1)", idea: "Transpose + reverse each row (or rotate four cells at a time)." },
     ref: function (m: number[][]) { const n = m.length; return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => m[n - 1 - j][i])); },
     gen: (r) => [[[[1, 2], [3, 4]]], [Array.from({ length: 4 }, () => r.arr(4, -100, 100))], [Array.from({ length: 7 }, () => r.arr(7, -1000, 1000))], [Array.from({ length: 20 }, () => r.arr(20, -1000, 1000))]],
+  },
+  // ───────────── Linked lists (refs use plain { val, next } objects) ─────────────
+  "reverse-linked-list": {
+    hints: ["You need to flip each node's `next` pointer — what must you remember before you overwrite it?", "Keep two pointers: the reversed part so far (`prev`) and the current node.", "Loop: save `next = cur.next`, set `cur.next = prev`, then move `prev = cur`, `cur = next`. Return `prev`."],
+    brute: { time: "O(n)", idea: "Copy values into an array and build a new list backwards (O(n) extra space)." },
+    optimal: { time: "O(n)", space: "O(1)", idea: "Iteratively re-point each node's next to the previous node." },
+    ref: function (head: { val: number; next: unknown } | null) {
+      let prev = null, cur = head as { val: number; next: unknown } | null;
+      while (cur) { const nx = cur.next as typeof cur; cur.next = prev; prev = cur; cur = nx; }
+      return prev;
+    },
+    gen: (r) => [[[1]], [[1, 2, 3]], [r.arr(10, -5000, 5000)], [r.arr(500, -5000, 5000)], [r.arr(5000, -5000, 5000)]],
+  },
+  "merge-two-sorted-lists": {
+    hints: ["At each step, which of the two current heads must come next in the output?", "A dummy head node saves you from special-casing the first node.", "Walk both lists, always attaching the smaller head to a tail pointer; when one list runs out, attach the rest of the other."],
+    brute: { time: "O((m+n) log(m+n))", idea: "Collect all values, sort, and build a new list." },
+    optimal: { time: "O(m + n)", space: "O(1)", idea: "Two-pointer merge with a dummy head, splicing existing nodes." },
+    ref: function (a: { val: number; next: unknown } | null, b: { val: number; next: unknown } | null) {
+      type N = { val: number; next: N | null };
+      const dummy: N = { val: 0, next: null }; let t = dummy, x = a as N | null, y = b as N | null;
+      while (x && y) { if (x.val <= y.val) { t.next = x; x = x.next; } else { t.next = y; y = y.next; } t = t.next!; }
+      t.next = x ?? y;
+      return dummy.next;
+    },
+    gen: (r) => {
+      const s = (n: number) => r.arr(n, -1000000000, 1000000000).sort((p, q) => p - q);
+      return [[[], [1]], [[5], [1, 2, 3]], [[1, 1, 1], [1, 1]], [s(20), s(3)], [s(2000), s(3000)], [s(10000), s(10000)]];
+    },
+  },
+  "middle-of-linked-list": {
+    hints: ["Counting the length first works — can you avoid the second pass?", "Move two pointers at different speeds.", "Slow moves 1 step, fast moves 2; when fast can't move any more, slow is at the (second) middle."],
+    brute: { time: "O(n)", idea: "Count the nodes, then walk n/2 steps (two passes)." },
+    optimal: { time: "O(n)", space: "O(1)", idea: "Fast and slow pointers in one pass." },
+    ref: function (head: { val: number; next: unknown } | null) {
+      type N = { val: number; next: N | null };
+      let slow = head as N | null, fast = head as N | null;
+      while (fast && fast.next) { slow = slow!.next; fast = fast.next.next; }
+      return slow;
+    },
+    gen: (r) => [[[1]], [[1, 2]], [[1, 2, 3]], [r.arr(11, 0, 100)], [r.arr(1000, 0, 100)], [r.arr(100000, -100000, 100000)]],
+  },
+  "palindrome-linked-list": {
+    hints: ["Copying the values into an array makes this easy — what does that cost in space?", "Find the middle with fast/slow pointers.", "Reverse the second half in place, then compare it with the first half node by node."],
+    brute: { time: "O(n)", idea: "Copy values to an array and use two pointers (O(n) extra space)." },
+    optimal: { time: "O(n)", space: "O(1)", idea: "Find the middle, reverse the second half, compare the halves." },
+    ref: function (head: { val: number; next: unknown } | null) {
+      const v: number[] = [];
+      for (let n = head as { val: number; next: unknown } | null; n; n = n.next as typeof n) v.push(n.val);
+      for (let i = 0, j = v.length - 1; i < j; i++, j--) if (v[i] !== v[j]) return false;
+      return true;
+    },
+    gen: (r) => {
+      const pal = (n: number) => { const h = r.arr(n, 0, 9); return [...h, ...(r.next() < 0.5 ? [r.int(0, 9)] : []), ...[...h].reverse()]; };
+      const broken = (n: number) => { const p = pal(n); p[r.int(0, p.length - 1)] = (p[0] + 1) % 10; return p; };
+      return [[[1]], [[1, 1]], [[1, 2, 1]], [[1, 2, 3, 1]], [pal(10)], [broken(10)], [pal(50000)], [broken(50000)]];
+    },
+  },
+  "remove-nth-from-end": {
+    hints: ["Knowing the length makes it easy — can you find the node in one pass instead?", "Two pointers with a gap of n nodes between them.", "Use a dummy head; move `fast` n steps ahead, then move both until fast reaches the last node; `slow.next` is the node to unlink."],
+    brute: { time: "O(n)", idea: "Count the length, then walk to node L − n (two passes)." },
+    optimal: { time: "O(n)", space: "O(1)", idea: "Dummy head plus two pointers n apart, one pass." },
+    ref: function (head: { val: number; next: unknown } | null, n: number) {
+      type N = { val: number; next: N | null };
+      const dummy: N = { val: 0, next: head as N | null }; let fast: N | null = dummy, slow: N = dummy;
+      for (let i = 0; i < n; i++) fast = fast!.next;
+      while (fast!.next) { fast = fast!.next; slow = slow.next!; }
+      slow.next = slow.next!.next;
+      return dummy.next;
+    },
+    gen: (r) => {
+      const out: unknown[][] = [[[1, 2], 2], [[1, 2, 3], 3], [[1, 2, 3], 1]];
+      for (const len of [7, 100, 10000]) out.push([r.arr(len, 0, 100), r.int(1, len)]);
+      return out;
+    },
+  },
+  "add-two-numbers": {
+    hints: ["Digits are least-significant first — that's the order you add numbers on paper.", "Track a carry as you walk both lists together.", "Loop while either list has nodes or carry > 0: digit = (a + b + carry) % 10, carry = floor(sum / 10)."],
+    brute: { time: "O(m + n)", idea: "Convert to big integers and back (breaks on fixed-width types)." },
+    optimal: { time: "O(max(m, n))", space: "O(max(m, n)) for the output", idea: "Digit-by-digit addition with a carry." },
+    ref: function (a: { val: number; next: unknown } | null, b: { val: number; next: unknown } | null) {
+      type N = { val: number; next: N | null };
+      const dummy: N = { val: 0, next: null }; let t = dummy, x = a as N | null, y = b as N | null, carry = 0;
+      while (x || y || carry) { const s = (x?.val ?? 0) + (y?.val ?? 0) + carry; carry = Math.floor(s / 10); t.next = { val: s % 10, next: null }; t = t.next; x = x?.next ?? null; y = y?.next ?? null; }
+      return dummy.next;
+    },
+    gen: (r) => {
+      const num = (n: number) => { const d = r.arr(n, 0, 9); d[n - 1] = r.int(1, 9); return n === 1 ? [r.int(0, 9)] : d; };
+      return [[[5], [5]], [[1], [9, 9, 9]], [num(3), num(7)], [num(30), num(30)], [Array(1000).fill(9), [1]], [num(1000), num(999)]];
+    },
+  },
+  "sort-list": {
+    hints: ["Which O(n log n) sort works well without random access?", "Split the list in half with fast/slow pointers, sort each half, merge.", "Recursive merge sort: cut at the middle, sortList(left), sortList(right), then merge two sorted lists with a dummy head."],
+    brute: { time: "O(n²)", idea: "Insertion sort into a new list." },
+    optimal: { time: "O(n log n)", space: "O(log n) recursion (O(1) bottom-up)", idea: "Merge sort on the list." },
+    ref: function (head: { val: number; next: unknown } | null) {
+      const v: number[] = [];
+      for (let n = head as { val: number; next: unknown } | null; n; n = n.next as typeof n) v.push(n.val);
+      v.sort((a, b) => a - b);
+      let h: { val: number; next: unknown } | null = null;
+      for (let i = v.length - 1; i >= 0; i--) h = { val: v[i], next: h };
+      return h;
+    },
+    gen: (r) => [[[1]], [[2, 1]], [[3, 3, 1, 1]], [r.arr(20, -100000, 100000)], [Array.from({ length: 2000 }, (_, i) => 2000 - i)], [r.arr(30000, -100000, 100000)]],
+  },
+  "reverse-k-group": {
+    hints: ["Before reversing a group, check that k nodes actually remain.", "Reversing one group is the reverse-a-list loop limited to k steps; you then need to reconnect both ends.", "Keep `groupPrev` (node before the group). Find the k-th node; if it exists, reverse the group, link groupPrev to the new first node and the old first node to what followed the group, then advance."],
+    brute: { time: "O(n)", idea: "Copy values into an array, reverse each full block of k, rebuild (O(n) space, and changes values rather than links)." },
+    optimal: { time: "O(n)", space: "O(1)", idea: "Iterative in-place reversal group by group with a dummy head." },
+    ref: function (head: { val: number; next: unknown } | null, k: number) {
+      const v: number[] = [];
+      for (let n = head as { val: number; next: unknown } | null; n; n = n.next as typeof n) v.push(n.val);
+      for (let i = 0; i + k <= v.length; i += k) { const part = v.slice(i, i + k).reverse(); for (let j = 0; j < k; j++) v[i + j] = part[j]; }
+      let h: { val: number; next: unknown } | null = null;
+      for (let i = v.length - 1; i >= 0; i--) h = { val: v[i], next: h };
+      return h;
+    },
+    gen: (r) => [[[1], 1], [[1, 2], 2], [[1, 2, 3], 1], [[1, 2, 3, 4], 4], [r.arr(10, 0, 1000), 3], [r.arr(100, 0, 1000), 7], [r.arr(5000, 0, 1000), 64], [r.arr(4999, 0, 1000), 2]],
+  },
+
+  // ───────────── Trees (refs use plain { val, left, right } objects) ─────────────
+  "max-depth-binary-tree": {
+    hints: ["How does the depth of a tree relate to the depths of its two subtrees?", "An empty tree has depth 0 — that's your base case.", "depth(node) = 1 + max(depth(left), depth(right)); or BFS and count the levels."],
+    brute: { time: "O(n)", idea: "Enumerate every root-to-leaf path and take the longest." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "DFS: 1 + max of the children's depths (or BFS by level)." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      let depth = 0; let level = root ? [root as T] : [];
+      while (level.length) { depth++; const next: T[] = []; for (const n of level) { if (n.left) next.push(n.left); if (n.right) next.push(n.right); } level = next; }
+      return depth;
+    },
+    gen: (r) => [[[1]], [[1, 2]], [randomTree(r, r.arr(15, -100, 100))], [randomTree(r, r.arr(200, -100, 100))], [randomTree(r, r.arr(2000, -100, 100), "left")], [randomTree(r, r.arr(10000, -100, 100), "balanced")]],
+  },
+  "invert-binary-tree": {
+    hints: ["Inverting a tree means inverting both subtrees and then…?", "Swap the children at every node — the order you visit nodes in doesn't matter.", "Recursively: swap root.left and root.right, then invert each; or do the same with a queue."],
+    brute: { time: "O(n)", idea: "Build a mirrored copy of the tree." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "Swap children at every node (DFS or BFS), in place." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const stack = root ? [root as T] : [];
+      while (stack.length) { const n = stack.pop()!; [n.left, n.right] = [n.right, n.left]; if (n.left) stack.push(n.left); if (n.right) stack.push(n.right); }
+      return root;
+    },
+    gen: (r) => [[[1]], [[1, 2]], [[1, null, 2]], [randomTree(r, r.arr(20, -100, 100))], [randomTree(r, r.arr(100, -100, 100))]],
+  },
+  "same-tree": {
+    hints: ["Two trees are the same when their roots match and…?", "Handle the cases where one or both nodes are null first.", "same(p, q) = both null, or both non-null with equal values and same(p.left, q.left) and same(p.right, q.right)."],
+    brute: { time: "O(n)", idea: "Serialise both trees (with null markers) and compare the strings." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "Simultaneous DFS comparing node by node." },
+    ref: function (p: unknown, q: unknown) {
+      type T = { val: number; left: T | null; right: T | null } | null;
+      const st: [T, T][] = [[p as T, q as T]];
+      while (st.length) { const [a, b] = st.pop()!; if (!a && !b) continue; if (!a || !b || a.val !== b.val) return false; st.push([a.left, b.left], [a.right, b.right]); }
+      return true;
+    },
+    gen: (r) => {
+      const t = randomTree(r, r.arr(40, -10, 10)); const u = [...t]; const i = u.findIndex((x, k) => k > 5 && x !== null); if (i > 0) u[i] = (u[i] as number) + 1;
+      const big = randomTree(r, r.arr(100, 0, 3));
+      return [[[], []], [[1], []], [[1], [1]], [[1, 2, 3], [1, 3, 2]], [t, [...t]], [t, u], [big, [...big]], [big, big.slice(0, -1)]];
+    },
+  },
+  "balanced-binary-tree": {
+    hints: ["Computing height separately at every node is O(n²) on a skewed tree — can one pass do both jobs?", "Return each subtree's height from the recursion, and a special value when it's already unbalanced.", "height(node): if a child returns -1 or |hl − hr| > 1 return -1, else return 1 + max(hl, hr). Balanced iff height(root) ≠ -1."],
+    brute: { time: "O(n²)", idea: "At every node compute both subtree heights from scratch." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "Post-order DFS returning height, or -1 as soon as an imbalance is found." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const h = new Map<T, number>(); const order: T[] = []; const st = root ? [root as T] : [];
+      while (st.length) { const n = st.pop()!; order.push(n); if (n.left) st.push(n.left); if (n.right) st.push(n.right); }
+      for (let i = order.length - 1; i >= 0; i--) {
+        const n = order[i]; const a = n.left ? h.get(n.left)! : 0, b = n.right ? h.get(n.right)! : 0;
+        if (Math.abs(a - b) > 1) return false;
+        h.set(n, 1 + Math.max(a, b));
+      }
+      return true;
+    },
+    gen: (r) => [[[1]], [[1, 2]], [[1, 2, null, 3]], [[1, 2, 3, 4, null, null, null, 5]], [randomTree(r, r.arr(31, 0, 9), "balanced")], [randomTree(r, r.arr(30, 0, 9))], [randomTree(r, r.arr(5000, 0, 9), "balanced")], [randomTree(r, r.arr(3000, 0, 9), "right")]],
+  },
+  "diameter-binary-tree": {
+    hints: ["The longest path bends at some node — what does it look like at that node?", "At a node, the best path through it is height(left) + height(right) edges.", "One DFS returning each subtree's height; update a global best with hl + hr at every node."],
+    brute: { time: "O(n²)", idea: "For every node, compute both subtree heights from scratch." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "Single post-order DFS: height up, best = max(best, hl + hr)." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const h = new Map<T, number>(); const order: T[] = []; const st = root ? [root as T] : []; let best = 0;
+      while (st.length) { const n = st.pop()!; order.push(n); if (n.left) st.push(n.left); if (n.right) st.push(n.right); }
+      for (let i = order.length - 1; i >= 0; i--) {
+        const n = order[i]; const a = n.left ? h.get(n.left)! : 0, b = n.right ? h.get(n.right)! : 0;
+        best = Math.max(best, a + b); h.set(n, 1 + Math.max(a, b));
+      }
+      return best;
+    },
+    gen: (r) => [[[1]], [[1, null, 2, null, 3]], [randomTree(r, r.arr(30, 0, 9))], [randomTree(r, r.arr(500, 0, 9))], [randomTree(r, r.arr(3000, 0, 9), "left")], [randomTree(r, r.arr(10000, 0, 9))]],
+  },
+  "level-order-traversal": {
+    hints: ["Which traversal visits nodes level by level?", "A queue gives you breadth-first order — how do you know where one level ends?", "BFS: at the start of each level, the queue length is the number of nodes in that level; pop exactly that many, pushing their children."],
+    brute: { time: "O(n·h)", idea: "For each depth d, run a DFS that collects nodes at depth d." },
+    optimal: { time: "O(n)", space: "O(n)", idea: "BFS with a queue, one level at a time." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const out: number[][] = []; let level = root ? [root as T] : [];
+      while (level.length) { out.push(level.map((n) => n.val)); const next: T[] = []; for (const n of level) { if (n.left) next.push(n.left); if (n.right) next.push(n.right); } level = next; }
+      return out;
+    },
+    gen: (r) => [[[1, 2]], [[1, null, 2, 3]], [randomTree(r, r.arr(25, -1000, 1000))], [randomTree(r, r.arr(2000, -1000, 1000))], [randomTree(r, r.arr(2000, -1000, 1000), "right")]],
+  },
+  "right-side-view": {
+    hints: ["The visible node on each level is the last one in left-to-right order.", "A level-by-level traversal gives you that directly.", "BFS by level and keep the last value of each level (or DFS visiting right before left, recording the first node at each new depth)."],
+    brute: { time: "O(n)", idea: "Full level-order traversal stored in memory, then take the last of each level." },
+    optimal: { time: "O(n)", space: "O(w) or O(h)", idea: "BFS keeping the last node per level, or right-first DFS." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const out: number[] = []; let level = root ? [root as T] : [];
+      while (level.length) { out.push(level[level.length - 1].val); const next: T[] = []; for (const n of level) { if (n.left) next.push(n.left); if (n.right) next.push(n.right); } level = next; }
+      return out;
+    },
+    gen: (r) => [[[1]], [[1, 2]], [[1, 2, 3, 4]], [randomTree(r, r.arr(15, -100, 100))], [randomTree(r, r.arr(100, -100, 100))], [randomTree(r, r.arr(100, -100, 100), "left")]],
+  },
+  "validate-bst": {
+    hints: ["Checking only each node against its direct children isn't enough — why?", "Every node must lie within a range set by its ancestors.", "DFS passing (low, high) bounds: left child gets (low, node.val), right gets (node.val, high). Or check the in-order traversal is strictly increasing."],
+    brute: { time: "O(n²)", idea: "For every node, scan its whole left and right subtrees." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "DFS with min/max bounds, or strictly increasing in-order traversal." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const st: [T, number, number][] = root ? [[root as T, -Infinity, Infinity]] : [];
+      while (st.length) {
+        const [n, lo, hi] = st.pop()!;
+        if (!(n.val > lo && n.val < hi)) return false;
+        if (n.left) st.push([n.left, lo, n.val]); if (n.right) st.push([n.right, n.val, hi]);
+      }
+      return true;
+    },
+    gen: (r) => {
+      const vals = r.distinct(500, -1000000, 1000000);
+      const good = bstFrom(vals);
+      const bad = [...good]; const idx = bad.findIndex((x, k) => k > 50 && x !== null); bad[idx] = (bad[0] as number);
+      return [[[1]], [[1, 1]], [[2147483647]], [[-2147483648, null, 2147483647]], [[10, 5, 15, null, null, 6, 20]], [[3, 1, 5, 0, 2, 4, 6]], [good], [bad], [bstFrom(r.distinct(5000, -2147483648, 2147483647))], [bstFrom(Array.from({ length: 2000 }, (_, i) => i))]];
+    },
+  },
+  "kth-smallest-bst": {
+    hints: ["Which traversal of a BST visits values in sorted order?", "You don't need the whole sorted list — you can stop early.", "Iterative in-order traversal with a stack; count nodes as you pop them and return the k-th."],
+    brute: { time: "O(n log n)", idea: "Collect every value, sort, take index k − 1." },
+    optimal: { time: "O(h + k)", space: "O(h)", idea: "In-order traversal that stops at the k-th node." },
+    ref: function (root: unknown, k: number) {
+      type T = { val: number; left: T | null; right: T | null };
+      const st: T[] = []; let c = root as T | null;
+      for (;;) { while (c) { st.push(c); c = c.left; } c = st.pop()!; if (--k === 0) return c.val; c = c.right; }
+    },
+    gen: (r) => {
+      const out: unknown[][] = [[[1], 1], [[2, 1], 2], [[1, null, 2], 2]];
+      for (const n of [10, 300, 10000]) out.push([bstFrom(r.distinct(n, -100000, 100000)), r.int(1, n)]);
+      out.push([bstFrom(Array.from({ length: 2000 }, (_, i) => 2000 - i)), 1500]);
+      return out;
+    },
+  },
+  "lca-bst": {
+    hints: ["In a BST, which side of the root are p and q on?", "If both values are smaller than the current node, the answer is in the left subtree; both larger — right.", "Walk down from the root: go left if both < node, right if both > node, otherwise the current node is where they split — return it."],
+    brute: { time: "O(n)", idea: "Find both root-to-node paths and take the last common node (ignores the BST property)." },
+    optimal: { time: "O(h)", space: "O(1)", idea: "Walk down from the root using the BST ordering until p and q split." },
+    ref: function (root: unknown, p: number, q: number) {
+      type T = { val: number; left: T | null; right: T | null };
+      let c = root as T;
+      for (;;) { if (p < c.val && q < c.val) c = c.left!; else if (p > c.val && q > c.val) c = c.right!; else return c.val; }
+    },
+    gen: (r) => {
+      const out: unknown[][] = [[[2, 1, 3], 1, 3], [[2, 1, 3], 3, 2], [[3, 1, null, null, 2], 2, 1]];
+      for (const n of [15, 400, 10000]) { const v = r.distinct(n, -1000000000, 1000000000); const p = r.pick(v); let q = r.pick(v); while (q === p) q = r.pick(v); out.push([bstFrom(v), p, q]); }
+      return out;
+    },
+  },
+  "build-tree-preorder-inorder": {
+    hints: ["The first value in preorder is always the root. Where is it in inorder, and what does that split tell you?", "Everything left of the root in inorder is the left subtree; its size tells you how much of preorder belongs to it.", "Map each value to its inorder index; recurse with a moving preorder pointer, building root → left (inorder range left of root) → right."],
+    brute: { time: "O(n²)", idea: "Recurse, searching linearly for the root in inorder each time." },
+    optimal: { time: "O(n)", space: "O(n)", idea: "Recursion with a hash map from value to inorder index and a preorder cursor." },
+    ref: function (pre: number[], ino: number[]) {
+      type T = { val: number; left: T | null; right: T | null };
+      if (!pre.length) return null;
+      // Iterative construction with a stack (no recursion depth issues).
+      const root: T = { val: pre[0], left: null, right: null }; const st: T[] = [root]; let j = 0;
+      for (let i = 1; i < pre.length; i++) {
+        let parent = st[st.length - 1]; const node: T = { val: pre[i], left: null, right: null };
+        if (parent.val !== ino[j]) parent.left = node;
+        else { while (st.length && st[st.length - 1].val === ino[j]) { parent = st.pop()!; j++; } parent.right = node; }
+        st.push(node);
+      }
+      return root;
+    },
+    gen: (r) => {
+      const trav = (level: (number | null)[]) => {
+        type T = { val: number; left: T | null; right: T | null };
+        const nodes: (T | null)[] = level.map((v) => (v === null ? null : { val: v, left: null, right: null }));
+        const root = nodes[0]; const q: T[] = root ? [root] : []; let i = 1;
+        for (let k = 0; k < q.length && i < nodes.length; k++) { const n = q[k]; n.left = nodes[i++] ?? null; if (n.left) q.push(n.left); if (i < nodes.length) { n.right = nodes[i++] ?? null; if (n.right) q.push(n.right); } }
+        const pre: number[] = [], ino: number[] = [];
+        const st: T[] = []; for (let c = root; c || st.length;) { while (c) { pre.push(c.val); st.push(c); c = c.left; } c = st.pop()!; ino.push(c.val); c = c.right; }
+        return [pre, ino];
+      };
+      return [[[1, 2], [2, 1]], [[1, 2], [1, 2]], trav(randomTree(r, r.distinct(20, -3000, 3000))), trav(randomTree(r, r.distinct(500, -3000, 3000))), trav(randomTree(r, r.distinct(3000, -3000, 3000), "right")), trav(randomTree(r, r.distinct(3000, -3000, 3000)))];
+    },
+  },
+  "max-path-sum": {
+    hints: ["At each node, the best path either passes through it (using both sides) or continues upward through one side only.", "A child's contribution should be ignored if it's negative.", "DFS returning the best single-branch sum `val + max(0, left, right)`; at each node update best with `val + max(0, left) + max(0, right)`."],
+    brute: { time: "O(n²)", idea: "Try every node as the top of the path and recompute the best downward branches." },
+    optimal: { time: "O(n)", space: "O(h)", idea: "Post-order DFS returning the best downward gain; update a global best through each node." },
+    ref: function (root: unknown) {
+      type T = { val: number; left: T | null; right: T | null };
+      const g = new Map<T, number>(); const order: T[] = []; const st = [root as T]; let best = -Infinity;
+      while (st.length) { const n = st.pop()!; order.push(n); if (n.left) st.push(n.left); if (n.right) st.push(n.right); }
+      for (let i = order.length - 1; i >= 0; i--) {
+        const n = order[i]; const a = Math.max(0, n.left ? g.get(n.left)! : 0), b = Math.max(0, n.right ? g.get(n.right)! : 0);
+        best = Math.max(best, n.val + a + b); g.set(n, n.val + Math.max(a, b));
+      }
+      return best;
+    },
+    gen: (r) => [[[-1]], [[2, -1]], [[-2, -1]], [[1, -2, 3]], [randomTree(r, r.arr(20, -1000, 1000))], [randomTree(r, r.arr(1000, -1000, 1000))], [randomTree(r, r.arr(3000, -1000, 1000), "left")], [randomTree(r, r.arr(30000, -1000, 1000))], [randomTree(r, r.arr(500, -1000, -1))]],
   },
 };

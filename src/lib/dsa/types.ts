@@ -5,7 +5,7 @@ export type Lang = (typeof LANGS)[number];
 export const LANG_LABELS: Record<Lang, string> = { python: "Python 3", javascript: "JavaScript", cpp: "C++17", java: "Java 17" };
 
 /** Value types a problem signature may use. Kept small so every language harness can support all of them. */
-export type ValueType = "int" | "double" | "bool" | "string" | "int[]" | "string[]" | "int[][]" | "string[][]";
+export type ValueType = "int" | "double" | "bool" | "string" | "int[]" | "string[]" | "int[][]" | "string[][]" | "ListNode" | "TreeNode";
 
 /**
  * How an output is compared with the expected one.

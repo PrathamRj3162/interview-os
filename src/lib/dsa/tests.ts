@@ -3,6 +3,7 @@ import { PROBLEM_BY_SLUG } from "./bank";
 import { SOLUTIONS } from "./solutions";
 import { makeRng, seedFrom } from "./rng";
 import { STRESS } from "./stress";
+import { callRef } from "./nodes";
 import type { Problem } from "./types";
 
 export type TestCase = { input: unknown[]; expected: unknown; hidden: boolean; stress?: boolean };
@@ -19,13 +20,13 @@ export function testsFor(slug: string): { problem: Problem; tests: TestCase[] } 
     const samples = problem.examples.map((e) => ({ input: e.input, expected: e.output, hidden: false }));
     const hidden = sol.gen(makeRng(seedFrom(slug))).map((input) => ({
       input,
-      expected: sol.ref(...structuredClone(input)),
+      expected: callRef(problem, sol.ref, input),
       hidden: true,
     }));
     // Stress tests go last: if a slow solution hits the judge's time limit, every earlier result is still printed.
     const stressGen = STRESS[slug];
     const stress = stressGen ? [stressGen(makeRng(seedFrom(`${slug}:stress`)))].map((input) => ({
-      input, expected: sol.ref(...structuredClone(input)), hidden: true, stress: true,
+      input, expected: callRef(problem, sol.ref, input), hidden: true, stress: true,
     })) : [];
     tests = [...samples, ...hidden, ...stress];
     cache.set(slug, tests);
