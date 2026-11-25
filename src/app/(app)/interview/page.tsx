@@ -18,12 +18,16 @@ const statusLabel: Record<string, { label: string; tone: "neutral" | "accent" | 
   evaluation_failed: { label: "Report failed", tone: "warning" },
 };
 
+const VERDICT_TONE: Record<string, "danger" | "warning" | "info" | "success" | "neutral"> = {
+  "No Hire": "danger", "Lean No": "warning", "Lean Hire": "info", Hire: "success", "Strong Hire": "success", "Not enough evidence": "neutral",
+};
+
 export default async function InterviewsPage() {
   const { supabase } = await requireUser();
   const { vibe } = await getPrefs();
   const { data: rows } = await supabase
     .from("mock_interviews")
-    .select("id, kind, persona, difficulty, mode, status, overall_score, started_at")
+    .select("id, kind, persona, difficulty, mode, status, overall_score, started_at, verdict:report->verdict->>label")
     .order("started_at", { ascending: false })
     .limit(50);
   const scored = (rows ?? []).filter((r) => r.status === "completed" && r.overall_score != null).slice(0, 10).reverse();
@@ -75,7 +79,7 @@ export default async function InterviewsPage() {
                       {new Date(r.started_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
                     </p>
                   </div>
-                  <Badge tone={s.tone}>{s.label}</Badge>
+                  {r.status === "completed" && r.verdict ? <Badge tone={VERDICT_TONE[String(r.verdict)] ?? "neutral"}>{String(r.verdict)}</Badge> : <Badge tone={s.tone}>{s.label}</Badge>}
                   {r.overall_score != null && <span className="w-14 text-right font-mono text-sm tabular-nums">{Math.round(Number(r.overall_score))}/100</span>}
                 </Link>
               </li>

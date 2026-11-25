@@ -37,12 +37,23 @@ export function mockReply(messages: ChatMessage[]): string {
     const transcript = inner(users.find((u) => u.includes('source="interview_transcript"')) ?? last);
     const answers = [...transcript.matchAll(/^A(\d+): (.+)$/gm)];
     const quote = (answers[0]?.[2] ?? "").split(/\s+/).slice(0, 6).join(" ");
+    // Code annotations quote a real line from the numbered final code, so validation can be exercised.
+    const codeMsg = users.find((u) => u.includes('source="final_code"'));
+    const codeLine = codeMsg ? inner(codeMsg).split("\n").map((l) => /^\s*(\d+)\| (.*)$/.exec(l)).find((m) => m && m[2].trim().length > 8) : null;
     return JSON.stringify({
       summary: "Mock evaluation of the candidate's answers.",
-      categories: ids.map((id) => ({ id, score: 3, evidence: quote ? [quote] : [], comment: "Mock comment." })),
+      categories: ids.map((id) => ({ id, score: 3, evidence: quote ? [quote] : [], comment: "Mock comment.", fix: `Mock fix for ${id}.` })),
+      drills: [
+        { title: "Mock drill one", how: "Do the first thing.", minutes: 20, kind: "dsa" },
+        { title: "Mock drill two", how: "Do the second thing.", minutes: 30, kind: "lesson" },
+        { title: "Mock drill three", how: "Do the third thing.", minutes: 25, kind: "mock" },
+      ],
+      code_notes: codeLine ? [
+        { line: Number(codeLine[1]), quote: codeLine[2].trim(), kind: "edge_case", note: "Mock note: check the empty input here." },
+        { line: 1, quote: "this text is not in the code", kind: "bug", note: "Fabricated note that must be dropped." },
+      ] : [],
       questions: answers.map((a) => ({ index: Number(a[1]), correct: ["Gave a direct answer"], missing: ["Trade-offs"], strong_answer: "Mock strong answer.", study: ["Mock topic"] })),
       strengths: ["Clear structure"], weaknesses: ["Limited depth"], mistakes: [], missed_concepts: ["k-fold cross-validation"],
-      priorities: [{ topic: "Validation", why: "Mock reason", action: "Practise explaining validation", kind: "lesson" }],
       communication_comment: "Mock communication comment.",
     });
   }

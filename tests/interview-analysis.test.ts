@@ -57,20 +57,27 @@ describe("evaluator schema leniency", async () => {
         summary: "ok",
         categories: [{ id: "architecture", score: "4", evidence: "I used DenseNet121 with transfer learning; invented quote never said", comment: "good" }],
         questions: [{ index: 0, correct: "Chose transfer learning", incomplete: "", incorrect: null, missing: "- validation\n- calibration", study: "k-fold" }],
-        priorities: ["Learn k-fold cross-validation", { topic: "Calibration", action: "Read about reliability diagrams", kind: "Lesson" }],
+        drills: ["Learn k-fold cross-validation", { title: "Calibration", how: "Read about reliability diagrams", kind: "Lesson", minutes: "45" }],
+        code_notes: "nonsense",
       }),
     }));
     const r = await evaluateInterview(
       { id: "x", kind: "project", difficulty: "medium", persona: "skeptic", mode: "mock", company: null, language: null, duration_min: 10, started_at: new Date().toISOString() },
       [{ role: "interviewer", content: "Why DenseNet?" }, { role: "candidate", content: "I used DenseNet121 with transfer learning because of feature reuse." }],
+      { metrics: { durationMin: 1, talkShare: 50, medianReplySec: null, questionsAsked: 0 } },
     );
     const arch = r.categories.find((c) => c.id === "architecture")!;
     expect(arch.score).toBe(4);
-    expect(arch.evidence).toEqual(["I used DenseNet121 with transfer learning"]);
+    expect(arch.evidence.map((e) => e.text)).toEqual(["I used DenseNet121 with transfer learning"]);
+    expect(arch.anchor).toBe(arch.anchors[3]); // the written meaning of a 4
     expect(r.evidence_dropped).toBe(1);
     expect(r.questions[0].missing).toEqual(["validation", "calibration"]);
+    expect(r.drills.map((d) => d.title)).toEqual(["Learn k-fold cross-validation", "Calibration"]);
+    expect(r.drills[1]).toMatchObject({ kind: "lesson", minutes: 45 });
     expect(r.priorities.map((p) => p.topic)).toEqual(["Learn k-fold cross-validation", "Calibration"]);
-    expect(r.priorities[1].kind).toBe("lesson");
-    expect(r.overall).toBe(75);
+    // One answer is not enough for a verdict — no guessing.
+    expect(r.verdict.level).toBeNull();
+    expect(r.overall).toBeNull();
+    expect(r.oneThing?.id).toBe("architecture");
   });
 });

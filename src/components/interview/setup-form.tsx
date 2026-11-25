@@ -17,7 +17,7 @@ const on = "border-accent bg-accent-soft";
 const off = "border-border bg-surface hover:border-border-strong hover:bg-surface-2";
 
 export function SetupForm({ defaults, resumes }: {
-  defaults: { kind: KindId; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
+  defaults: { kind: KindId; problem?: string | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
   resumes: { id: string; file_name: string; analysed: boolean }[];
 }) {
   const [state, action, pending] = useActionState(createInterview, null);
@@ -31,7 +31,7 @@ export function SetupForm({ defaults, resumes }: {
   const [resumeId, setResumeId] = useState(defaults.resumeId ?? "none");
   const [language, setLanguage] = useState(defaults.language ?? "none");
   const [company, setCompany] = useState(defaults.company ?? "none");
-  const [problem, setProblem] = useState("none");
+  const [problem, setProblem] = useState(defaults.problem ?? "none");
   const isDsa = kind === "dsa";
   // DSA round in Python: start downloading the in-browser Python runtime now, so the first Run in the room is instant.
   useEffect(() => { if (isDsa && (language === "python" || (language === "none" && defaults.language === "python"))) warmPython(); }, [isDsa, language, defaults.language]);

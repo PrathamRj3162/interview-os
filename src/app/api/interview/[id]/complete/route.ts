@@ -5,9 +5,27 @@ import { recordUsage } from "@/lib/ai/quota";
 import { evaluateInterview } from "@/lib/interview/engine";
 import { loadInterview, loadTurns } from "@/lib/interview/server";
 import { pairTurns } from "@/lib/interview/analysis";
-import type { DsaReport } from "@/lib/interview/engine";
+import type { DsaReport, EvaluationContext } from "@/lib/interview/engine";
+import { computeMetrics } from "@/lib/interview/metrics";
 import { dsaContextFor, loadEvents, type Workspace } from "@/lib/dsa/server";
 import { PHASE_LABELS, type Phase } from "@/lib/dsa/phases";
+import { STRESS } from "@/lib/dsa/stress";
+import { PROBLEMS } from "@/lib/dsa/bank";
+import type { Problem } from "@/lib/dsa/types";
+
+const DIFF_RANK = { easy: 0, medium: 1, hard: 2 } as const;
+
+/** Two problems to practise next: shared topics, one step harder when possible, not already solved. */
+function nextProblems(p: Problem, solved: Set<string>) {
+  const target = Math.min(2, DIFF_RANK[p.difficulty] + 1);
+  return PROBLEMS
+    .filter((q) => q.slug !== p.slug && !solved.has(q.slug))
+    .map((q) => ({ q, overlap: q.topics.filter((t) => p.topics.includes(t)).length }))
+    .filter((x) => x.overlap > 0)
+    .sort((a, b) => Math.abs(DIFF_RANK[a.q.difficulty] - target) - Math.abs(DIFF_RANK[b.q.difficulty] - target) || b.overlap - a.overlap || a.q.slug.localeCompare(b.q.slug))
+    .slice(0, 2)
+    .map(({ q }) => ({ slug: q.slug, title: q.title, difficulty: q.difficulty }));
+}
 
 export const maxDuration = 120;
 
@@ -35,8 +53,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ status: "abandoned", message: "No answers were given, so there's nothing to evaluate." });
   }
 
+  const endedAt = iv.ended_at ?? new Date().toISOString();
   const lock = await supabase.from("mock_interviews")
-    .update({ status: "evaluating", ended_at: iv.ended_at ?? new Date().toISOString() })
+    .update({ status: "evaluating", ended_at: endedAt })
     .eq("id", id).in("status", ["in_progress", "evaluation_failed"])
     .select("id");
   if (!lock.data?.length) return NextResponse.json({ status: "evaluating" }, { status: 202 });
@@ -46,11 +65,19 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     // DSA round: gather objective facts (judge results, hints, pastes) to ground the evaluation.
     let dsaReport: DsaReport | undefined;
     let facts: string | undefined;
+    const pairs = pairTurns(turns);
+    const ctx: EvaluationContext = {
+      metrics: computeMetrics({ startedAt: iv.started_at, endedAt, turns }),
+      hintsUsed: turns.filter((t) => t.role === "interviewer" && t.content.startsWith("[Hint")).length,
+    };
+    const lastCode = [...pairs].reverse().find((p) => p.code?.trim())?.code;
+    if (lastCode) ctx.code = { language: iv.language ?? "code", source: lastCode };
     const dsa = dsaContextFor(iv);
     if (dsa) {
-      const [events, subs] = await Promise.all([
+      const [events, subs, solved] = await Promise.all([
         loadEvents(supabase, id),
         supabase.from("submissions").select("status, passed, total, language, created_at").eq("interview_id", id).order("created_at"),
+        supabase.from("submissions").select("problem_slug").eq("status", "accepted").limit(1000),
       ]);
       const ws = iv.workspace as Workspace | null;
       const phases = ["intro", ...events.filter((e) => e.type === "phase").map((e) => String(e.payload.to))];
@@ -65,17 +92,29 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         idleMinutes: Math.round(events.filter((e) => e.type === "idle").reduce((a, e) => a + (Number(e.payload.seconds) || 0), 0) / 60),
         phasesReached: [...new Set(phases)].map((p) => PHASE_LABELS[p as Phase] ?? p),
         optimal: dsa.solution.optimal, brute: dsa.solution.brute,
+        next: nextProblems(dsa.problem, new Set((solved.data ?? []).map((s) => s.problem_slug as string))),
       };
+      const stressCount = STRESS[dsa.problem.slug] ? 1 : 0;
+      const ranked = dsaReport.submissions.map((s) => ({ ...s, ratio: s.passed / Math.max(1, s.total) }));
+      const top = ranked.find((s) => s.status === "accepted") ?? ranked.sort((a, b) => b.ratio - a.ratio)[0];
+      ctx.coding = {
+        best: top ? { status: top.status, passed: top.passed, total: top.total, regularAllPassed: top.passed >= top.total - stressCount } : null,
+        examplesPassed: events.some((e) => e.type === "run" && e.payload.status === "accepted"),
+      };
+      ctx.hintsUsed = dsaReport.hintsUsed;
+      ctx.metrics = computeMetrics({ startedAt: iv.started_at, endedAt, turns, events, submissions: subs.data ?? [] });
+      if (dsaReport.finalCode.trim()) ctx.code = { language: dsaReport.language, source: dsaReport.finalCode };
       const best = dsaReport.submissions.reduce<DsaReport["submissions"][number] | null>((b, s) => (!b || s.passed / Math.max(1, s.total) > b.passed / Math.max(1, b.total) ? s : b), null);
       facts = [
         `Problem: ${dsa.problem.title} (${dsa.problem.difficulty}). Optimal: ${dsa.solution.optimal.idea} — time ${dsa.solution.optimal.time}, space ${dsa.solution.optimal.space}.`,
         `Submissions to the judge: ${dsaReport.submissions.length}${best ? `; best: ${best.status}, ${best.passed}/${best.total} tests` : " (never submitted)"}.`,
         `Sample runs: ${dsaReport.browserRuns + dsaReport.judgeRuns}. Hints used: ${dsaReport.hintsUsed}/3. Large pastes into the editor: ${dsaReport.pastes.length}.`,
         `Phases reached: ${dsaReport.phasesReached.join(" → ")}.`,
-        `Final code (${dsaReport.language}):\n${dsaReport.finalCode.slice(0, 6000)}`,
-      ].join("\n");
+        ctx.metrics.coding ? `Timeline: first run at ${ctx.metrics.coding.firstRunMin ?? "—"} min, first submit at ${ctx.metrics.coding.firstSubmitMin ?? "—"} min, accepted at ${ctx.metrics.coding.acceptedMin ?? "never"} min.` : "",
+      ].filter(Boolean).join("\n");
     }
-    const report = await evaluateInterview(iv, turns, facts);
+    ctx.facts = facts;
+    const report = await evaluateInterview(iv, turns, ctx);
     if (dsaReport) report.dsa = dsaReport;
     await recordUsage(supabase, user.id, "interview_report", report.provider, report.model);
     const done = await supabase.from("mock_interviews")

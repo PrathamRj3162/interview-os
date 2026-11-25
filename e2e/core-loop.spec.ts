@@ -107,8 +107,15 @@ test("interview: text mock interview → evidence-based report → tasks on dash
   await page.getByRole("button", { name: "Yes, end" }).click();
   await expect(page).toHaveURL(/\/report$/, { timeout: 180_000 });
   await expect(page.getByRole("heading", { name: "Rubric" })).toBeVisible();
+  // Report v2: deterministic verdict with its steps, the one thing to fix, drills, measured metrics, timestamped quotes
+  await expect(page.getByTestId("verdict")).toContainText(/Hire|Lean|No Hire|Not enough evidence/);
+  await expect(page.getByText("How the verdict was decided")).toBeVisible();
+  await expect(page.getByText("The one thing to fix")).toBeVisible();
+  await expect(page.getByText("Mock drill one")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Measured, not judged" })).toBeVisible();
+  await expect(page.getByTitle("When you said it").first()).toHaveText(/^\d+:\d\d$/);
   await expect(page.getByText("Question-by-question feedback")).toBeVisible();
-  const overall = await page.getByText("Overall", { exact: true }).first().locator("..").textContent();
+  const overall = await page.getByTestId("verdict").textContent();
   console.log("[report overall]", overall);
   // Our own answer text is shown verbatim
   await page.getByText("Question 1").first().click();

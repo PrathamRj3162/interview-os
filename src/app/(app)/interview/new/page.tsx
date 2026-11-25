@@ -6,10 +6,11 @@ import { getProfile } from "@/lib/profile-data";
 import { KINDS, type KindId } from "@/lib/interview/config";
 import { aiStatus } from "@/lib/ai";
 import { Card } from "@/components/ui/card";
+import { getProblem } from "@/lib/dsa/bank";
 
 export const metadata: Metadata = { title: "New interview" };
 
-export default async function NewInterviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; resume?: string }> }) {
+export default async function NewInterviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; resume?: string; problem?: string }> }) {
   const sp = await searchParams;
   const { supabase, user } = await requireUser();
   const [profile, { data: resumes }] = await Promise.all([
@@ -18,6 +19,8 @@ export default async function NewInterviewPage({ searchParams }: { searchParams:
   ]);
   const list = (resumes ?? []).map((r) => ({ id: r.id, file_name: r.file_name, analysed: (r.resume_analyses ?? []).some((a) => a.ai_findings), active: r.is_active }));
   const kind = (sp.kind && sp.kind in KINDS ? sp.kind : "resume_screen") as KindId;
+  // "Practise next" links from a report pre-select the problem and a matching difficulty.
+  const problem = kind === "dsa" ? getProblem(sp.problem) : null;
   const resumeId = list.find((r) => r.id === sp.resume)?.id ?? list.find((r) => r.active)?.id ?? null;
 
   return (
@@ -29,7 +32,7 @@ export default async function NewInterviewPage({ searchParams }: { searchParams:
       {aiStatus().length === 0 ? (
         <Card className="text-sm text-muted">Mock interviews need an AI provider, and none is configured on this server right now.</Card>
       ) : (
-        <SetupForm defaults={{ kind, language: profile?.preferred_language ?? null, company: profile?.target_companies?.[0] ?? null, resumeId }} resumes={list} />
+        <SetupForm defaults={{ kind, problem: problem?.slug ?? null, ...(problem ? { difficulty: problem.difficulty } : {}), language: profile?.preferred_language ?? null, company: profile?.target_companies?.[0] ?? null, resumeId }} resumes={list} />
       )}
     </div>
   );

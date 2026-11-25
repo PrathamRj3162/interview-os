@@ -3,7 +3,10 @@ import { z } from "zod";
 import { generateObject, type ChatMessage } from "@/lib/ai";
 import { untrusted } from "@/lib/ai/json";
 import { PERSONAS, KINDS, KIND_FOCUS, RUBRICS, DIFFICULTIES, type KindId, type PersonaId, type Difficulty } from "./config";
-import { pairTurns, communicationStats, overallScore, quoteInTranscript, type Turn } from "./analysis";
+import { pairTurns, communicationStats, type Turn } from "./analysis";
+import { anchorsFor, isCore, weightOf, type Anchors } from "./rubric";
+import { computeVerdict, pickOneThing, type CodingFacts, type Verdict } from "./verdict";
+import { locateQuote, numberLines, validateCodeNotes, type CodeNote, type Metrics } from "./metrics";
 
 export type InterviewRow = {
   id: string; kind: KindId; difficulty: Difficulty; persona: PersonaId; mode: "mock" | "practice";
@@ -171,23 +174,35 @@ const planKind = z.unknown().optional().transform((v) => {
   const l = String(v ?? "lesson").toLowerCase().replace(/[\s-]+/g, "_");
   return (PLAN_KINDS as readonly string[]).includes(l) ? (l as (typeof PLAN_KINDS)[number]) : l.includes("design") ? "system_design" : l.includes("interview") ? "mock" : "lesson";
 });
-const priority = z.union([
-  z.string().transform((s) => ({ topic: s.slice(0, 120), why: "", action: s.slice(0, 400), kind: "lesson" as const })),
-  z.object({ topic: text(120), why: text(400), action: text(400), kind: planKind }).partial().transform((p) => ({
-    topic: (p.topic || p.action || "").slice(0, 120), why: p.why ?? "", action: p.action || p.topic || "", kind: p.kind ?? ("lesson" as const),
+
+const score4 = z.union([z.number(), z.string(), z.null()]).optional().transform((v) => {
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  return typeof n === "number" && Number.isFinite(n) ? Math.min(4, Math.max(1, Math.round(n))) : null;
+});
+
+const drill = z.union([
+  z.string().transform((s) => ({ title: s.slice(0, 120), how: s.slice(0, 500), minutes: 30, kind: "lesson" as const })),
+  z.object({ title: text(120), how: text(500), minutes: z.coerce.number().optional(), kind: planKind }).partial().transform((d) => ({
+    title: (d.title || d.how || "").slice(0, 120), how: d.how || d.title || "",
+    minutes: Math.min(120, Math.max(10, Math.round(Number(d.minutes) || 30))), kind: d.kind ?? ("lesson" as const),
   })),
 ]);
+
+const codeNote = z.object({
+  line: z.coerce.number().int().catch(0),
+  quote: text(300),
+  kind: z.string().catch("style").transform((k) => k.toLowerCase().replace(/[\s-]+/g, "_")),
+  note: text(400),
+});
 
 const evalSchema = z.object({
   summary: text(1500).refine((v) => v.trim().length > 0, "summary required"),
   categories: z.array(z.object({
     id: z.string(),
-    score: z.union([z.number(), z.string(), z.null()]).optional().transform((v) => {
-      const n = typeof v === "string" ? parseFloat(v) : v;
-      return typeof n === "number" && Number.isFinite(n) ? Math.min(5, Math.max(1, Math.round(n))) : null;
-    }),
+    score: score4,
     evidence: strList(4, 400),
     comment: text(600),
+    fix: text(400),
   })),
   questions: z.array(z.object({
     index: z.coerce.number().int().min(0),
@@ -204,20 +219,38 @@ const evalSchema = z.object({
   weaknesses: strList(8, 400),
   mistakes: strList(8, 400),
   missed_concepts: strList(12, 160),
-  priorities: z.array(priority).max(8).default([]).transform((ps) => ps.filter((p) => p.topic.trim()).slice(0, 6)),
+  drills: z.array(z.unknown()).catch([]).default([]).transform((ds) => ds.flatMap((d) => { const r = drill.safeParse(d); return r.success && r.data.title.trim() ? [r.data] : []; }).slice(0, 3)),
+  code_notes: z.array(z.unknown()).catch([]).default([]).transform((ns) => ns.flatMap((n) => { const r = codeNote.safeParse(n); return r.success ? [r.data] : []; }).slice(0, 20)),
   communication_comment: text(800),
 });
 
+export type Evidence = { text: string; at: number | null };
+export type ReportCategory = {
+  id: string; name: string; desc: string; core: boolean; weight: number;
+  score: number | null; anchor: string | null; anchors: Anchors;
+  evidence: Evidence[]; comment: string; fix: string; source: "ai" | "judge";
+};
+export type Drill = z.infer<typeof evalSchema>["drills"][number];
+
 export type InterviewReport = {
-  version: 1;
+  version: 2;
+  /** Rubric scale: 4 for v2 reports (v1 reports used 1–5; see lib/interview/report-view). */
+  scale: 4;
   summary: string;
   overall: number | null;
+  verdict: Verdict;
+  oneThing: { id: string; name: string; score: number; fix: string } | null;
+  drills: Drill[];
+  metrics: Metrics;
   methodology: string;
-  categories: { id: string; name: string; desc: string; score: number | null; evidence: string[]; comment: string }[];
+  categories: ReportCategory[];
   questions: (z.infer<typeof evalSchema>["questions"][number] & { question: string; answer: string; code: string | null })[];
   strengths: string[]; weaknesses: string[]; mistakes: string[]; missed_concepts: string[];
-  priorities: z.infer<typeof evalSchema>["priorities"];
+  /** Kept for the study plan: the drills, as tasks. */
+  priorities: { topic: string; why: string; action: string; kind: Drill["kind"] }[];
   communication: ReturnType<typeof communicationStats> & { comment: string };
+  /** The candidate's final code with verified line annotations. */
+  code?: { language: string; source: string; notes: CodeNote[]; dropped: number };
   evidence_dropped: number;
   provider: string; model: string;
   /** DSA live-coding round: objective facts from the judge and the room (computed in code, not by AI). */
@@ -231,48 +264,90 @@ export type DsaReport = {
   browserRuns: number; judgeRuns: number; hintsUsed: number; pastes: { chars: number }[]; idleMinutes: number;
   phasesReached: string[];
   optimal: { time: string; space: string; idea: string }; brute: { time: string; idea: string };
+  /** Problems to practise next (same topics; one step harder when possible). */
+  next?: { slug: string; title: string; difficulty: string }[];
 };
 
-export async function evaluateInterview(iv: InterviewRow, turns: Turn[], objectiveFacts?: string): Promise<InterviewReport> {
+export type EvaluationContext = {
+  /** Objective facts for the evaluator (judge results, hints, editor events). */
+  facts?: string;
+  metrics: Metrics;
+  hintsUsed?: number;
+  coding?: CodingFacts;
+  /** Final code to annotate (DSA final code, or the last code sent in other rounds). */
+  code?: { language: string; source: string };
+};
+
+const SUB_LABEL: Record<string, string> = { accepted: "Accepted", wrong_answer: "Wrong answer", runtime_error: "Runtime error", compile_error: "Compile error", time_limit: "Too slow / time limit", error: "Error" };
+
+/** Objective correctness from the judge, for coding rounds that submitted. */
+function judgeCorrectness(c: CodingFacts): { score: number; evidence: string } | null {
+  if (!c.best) return null;
+  const { status, passed, total, regularAllPassed } = c.best;
+  const score = status === "accepted" ? 4 : status === "time_limit" && regularAllPassed ? 3 : passed / Math.max(1, total) >= 0.7 ? 2 : 1;
+  return { score, evidence: `Judge: ${SUB_LABEL[status] ?? status}, ${passed}/${total} tests passed (best submission).` };
+}
+
+type TimedTurnRow = Turn & { created_at?: string };
+
+export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[], ctx: EvaluationContext): Promise<InterviewReport> {
   const pairs = pairTurns(turns);
   const rubric = RUBRICS[iv.kind];
-  const candidateText = turns.filter((t) => t.role === "candidate").map((t) => t.content).join("\n");
+  const candTurns = turns.filter((t) => t.role === "candidate").map((t) => ({ content: t.content, created_at: t.created_at ?? iv.started_at }));
   const comm = communicationStats(pairs.map((p) => p.answer));
 
   const transcript = pairs.map((p) =>
-    `Q${p.index}: ${p.question}\nA${p.index}: ${p.answer}${p.code ? `\n[Code]\n${p.code.slice(0, 6000)}` : ""}`,
+    `Q${p.index}: ${p.question}\nA${p.index}: ${p.answer}${p.code && !ctx.code ? `\n[Code]\n${p.code.slice(0, 6000)}` : ""}`,
   ).join("\n\n");
+
+  const rubricLines = rubric.flatMap((r) => {
+    const a = anchorsFor(r.id);
+    return [`- ${r.id}: ${r.name}${isCore(iv.kind, r.id) ? " (CORE)" : ""} — ${r.desc}`, ...a.map((x, i) => `    ${i + 1} = ${x}`)];
+  });
+
+  const code = ctx.code?.source.trim() ? { ...ctx.code, source: ctx.code.source.slice(0, 12000) } : undefined;
 
   const { data, provider, model } = await generateObject(evalSchema, [
     {
       role: "system",
       content: [
         `You are an experienced interviewer writing a rigorous, fair evaluation of a ${KINDS[iv.kind].name} (difficulty: ${iv.difficulty}, target role context: ${iv.company ?? "general"}).`,
-        "Evaluate ONLY what the candidate actually said in the transcript. Never invent statements, never assume knowledge that wasn't demonstrated.",
-        "Rubric — score each category 1–5 (1 = not demonstrated, 2 = weak, 3 = acceptable, 4 = strong, 5 = exceptional for this difficulty). If the transcript gives no evidence for a category, use score null.",
-        ...rubric.map((r) => `- ${r.id}: ${r.name} — ${r.desc}`),
-        "For each category, `evidence` must be SHORT EXACT QUOTES (3–25 words) copied from the candidate's answers that justify the score.",
+        "Evaluate ONLY what the candidate actually said or wrote. Never invent statements, never assume knowledge that wasn't demonstrated.",
+        "Rubric — score each category 1–4 using its ANCHORS below (pick the anchor that best matches the evidence; there is no middle option). If the transcript gives no evidence for a category, use score null.",
+        ...rubricLines,
+        "For each category: `evidence` = 1–3 SHORT EXACT QUOTES (3–25 words) copied from the candidate's answers that justify the score; `comment` = one or two sentences; `fix` = ONE concrete, specific action that would move this category up one level next time.",
         "For each question index, list what was correct / incomplete / technically incorrect / missing, describe what a strong answer would contain, suggest a better answer structure, topics to study, and realistic follow-ups.",
+        "drills: exactly 3 practice drills targeting the weakest areas, each {title, how (specific steps), minutes, kind}; kind is one of dsa, lesson, quiz, system_design, project, mock, revision, resume.",
+        code
+          ? "code_notes: up to 8 annotations of the candidate's FINAL CODE (lines are numbered). Each {line, quote (the exact code text on that line, at least a few characters), kind (bug | edge_case | complexity | style | good), note (one sentence)}. Prioritise real bugs and missed edge cases; include at most 2 'good' notes."
+          : "code_notes: [] (no code in this round).",
         "Communication: judge structure, relevance, clarity and conciseness only. Do NOT comment on accent, voice, personality, intelligence or honesty.",
-        "priorities: up to 5 concrete next steps tied to observed weaknesses; `kind` picks where to practise.",
-        "Return JSON with keys: summary, categories[{id,score,evidence,comment}], questions[{index,...}], strengths, weaknesses, mistakes, missed_concepts, priorities, communication_comment.",
+        "Do NOT give an overall verdict or hiring recommendation; the platform computes it from your category scores.",
+        "Return JSON with keys: summary, categories[{id,score,evidence,comment,fix}], questions[{index,...}], strengths, weaknesses, mistakes, missed_concepts, drills, code_notes, communication_comment.",
       ].join("\n"),
     },
     { role: "user", content: untrusted("interview_transcript", transcript) },
-    ...(objectiveFacts ? [{ role: "user" as const, content: `Objective facts recorded by the platform (code judge results, hints, editor events) — use them, they are not candidate claims:\n${untrusted("platform_facts", objectiveFacts)}` }] : []),
-  ], { temperature: 0.2, maxTokens: 8000 });
+    ...(ctx.facts ? [{ role: "user" as const, content: `Objective facts recorded by the platform (code judge results, hints, editor events, timings) — use them, they are not candidate claims:\n${untrusted("platform_facts", ctx.facts)}` }] : []),
+    ...(code ? [{ role: "user" as const, content: `The candidate's final code (${code.language}), with line numbers:\n${untrusted("final_code", numberLines(code.source))}` }] : []),
+  ], { temperature: 0.2, maxTokens: 9000 });
 
-  // Verify evidence quotes are real; a category with a score but no surviving evidence is marked unscored.
+  // Evidence must be real (and gets a timestamp); a category with a score but no surviving evidence is unscored.
   let dropped = 0;
-  const categories = rubric.map((r) => {
+  const judged = ctx.coding ? judgeCorrectness(ctx.coding) : null;
+  const categories: ReportCategory[] = rubric.map((r) => {
     const c = data.categories.find((x) => x.id === r.id);
-    const evidence = (c?.evidence ?? []).filter((q) => {
-      const ok = quoteInTranscript(q, candidateText);
-      if (!ok) dropped++;
-      return ok;
-    });
+    const anchors = anchorsFor(r.id);
+    const base = { ...r, core: isCore(iv.kind, r.id), weight: weightOf(iv.kind, r.id), anchors, comment: c?.comment ?? "", fix: c?.fix ?? "" };
+    if (iv.kind === "dsa" && r.id === "correctness" && judged) {
+      return { ...base, score: judged.score, anchor: anchors[judged.score - 1], evidence: [{ text: judged.evidence, at: null }], source: "judge" as const };
+    }
+    const evidence: Evidence[] = [];
+    for (const q of c?.evidence ?? []) {
+      const hit = locateQuote(q, candTurns, iv.started_at);
+      if (hit.found) evidence.push({ text: q, at: hit.at }); else dropped++;
+    }
     const score = c?.score != null && evidence.length > 0 ? c.score : null;
-    return { ...r, score, evidence, comment: c?.comment ?? "" };
+    return { ...base, score, anchor: score ? anchors[score - 1] : null, evidence, source: "ai" as const };
   });
 
   const questions = pairs.map((p) => {
@@ -284,16 +359,29 @@ export async function evaluateInterview(iv: InterviewRow, turns: Turn[], objecti
     };
   });
 
+  const verdict = computeVerdict({ categories, answers: pairs.length, hintsUsed: ctx.hintsUsed, coding: ctx.coding });
+  const weakest = pickOneThing(categories);
+  const oneThing = weakest && weakest.score != null
+    ? { id: weakest.id, name: weakest.name, score: weakest.score, fix: weakest.fix || weakest.comment || `Work on: ${weakest.desc}` }
+    : null;
+  const notes = code ? validateCodeNotes(code.source, data.code_notes) : null;
+
   return {
-    version: 1,
+    version: 2,
+    scale: 4,
     summary: data.summary,
-    overall: overallScore(categories),
-    methodology: "Each rubric category is scored 1–5 by the AI evaluator and must cite exact quotes from your answers; categories without verifiable evidence are left unscored. The overall score is the mean of scored categories mapped to 0–100. Filler-word and length statistics are counted directly from your transcript. This is practice feedback, not a hiring decision.",
+    overall: verdict.overall,
+    verdict,
+    oneThing,
+    drills: data.drills,
+    metrics: ctx.metrics,
+    methodology: "Each rubric category is scored 1–4 against written anchors by the AI evaluator and must cite exact quotes from your answers (shown with the time you said them); quotes that aren't in your transcript are discarded, and a category without verifiable evidence stays unscored. In coding rounds, Correctness comes from the code judge, not the AI. The verdict is then computed by fixed rules — a weighted mean (core categories count double) mapped to a level, with caps for a score of 1, failing or slow code, and hints — shown step by step. Timings, talk share and filler words are measured directly. This is practice feedback, not a hiring decision.",
     categories,
     questions,
     strengths: data.strengths, weaknesses: data.weaknesses, mistakes: data.mistakes, missed_concepts: data.missed_concepts,
-    priorities: data.priorities,
+    priorities: data.drills.map((d) => ({ topic: d.title, why: oneThing ? `Your weakest area was ${oneThing.name.toLowerCase()}.` : "", action: d.how, kind: d.kind })),
     communication: { ...comm, comment: data.communication_comment },
+    ...(code && notes ? { code: { language: code.language, source: code.source, notes: notes.notes, dropped: notes.dropped } } : {}),
     evidence_dropped: dropped,
     provider, model,
   };

@@ -1,0 +1,236 @@
+/**
+ * Anchored 1–4 rubric. Each category's score has a written meaning, so a "3" means the same thing in
+ * every report, and the evaluator is told exactly what each level requires.
+ *   1 = not demonstrated / wrong · 2 = partial, needed prompting · 3 = solid, meets the bar · 4 = strong, unprompted
+ * A 4-point scale (no middle option) forces a lean to one side of the bar.
+ */
+import type { KindId } from "./config";
+
+export type Anchors = [string, string, string, string];
+
+export const ANCHORS: Record<string, Anchors> = {
+  // DSA
+  understanding: [
+    "Started without understanding the problem, or misread it.",
+    "Understood the basic task but missed constraints or input details until prompted.",
+    "Restated the problem and asked about the key constraints/inputs before designing.",
+    "Clarified constraints, edge inputs and expected output precisely before any design, unprompted.",
+  ],
+  approach: [
+    "No workable approach.",
+    "Reached a working approach only with heavy prompting, or stopped at brute force.",
+    "Gave a brute force, then a justified optimisation with suitable data structures.",
+    "Moved quickly to the optimal approach, compared alternatives and justified the choice clearly.",
+  ],
+  correctness: [
+    "Solution or explanations are incorrect.",
+    "Partially correct: works on simple cases but has significant errors.",
+    "Correct, with at most minor issues.",
+    "Fully correct and robust, including the tricky cases.",
+  ],
+  edge_cases: [
+    "Did not consider edge cases or test the solution.",
+    "Mentioned an edge case or two only when asked; little testing.",
+    "Identified the main edge cases and dry-ran at least one example.",
+    "Systematically covered edge cases and dry-ran the code, catching issues themselves.",
+  ],
+  complexity: [
+    "Could not state time or space complexity, or stated it wrongly.",
+    "Stated complexity partly correctly, or without reasoning.",
+    "Correct time and space complexity with reasoning.",
+    "Correct complexity with clear reasoning, and discussed how it compares with alternatives.",
+  ],
+  code_quality: [
+    "Code is hard to follow or largely missing.",
+    "Works but with unclear names, duplication or awkward structure.",
+    "Readable, sensibly named, reasonably idiomatic code.",
+    "Clean, idiomatic, well-structured code an interviewer would happily merge.",
+  ],
+  communication: [
+    "Hard to follow; long silences or unclear explanations.",
+    "Explained some steps, but often unclear or only when asked.",
+    "Thought aloud clearly and kept the interviewer in the loop.",
+    "Consistently clear, structured and concise; drove the conversation.",
+  ],
+  // System design
+  requirements: [
+    "Jumped into design without clarifying scope.",
+    "Clarified some requirements, missing key functional or non-functional ones.",
+    "Clarified functional and key non-functional requirements before designing.",
+    "Scoped precisely, prioritised requirements and stated assumptions explicitly.",
+  ],
+  estimation: [
+    "No estimates, or estimates unrelated to the design.",
+    "Rough estimates with errors, or not used to drive decisions.",
+    "Reasonable traffic/storage estimates that informed the design.",
+    "Quick, accurate estimates that clearly drove specific design decisions.",
+  ],
+  architecture: [
+    "No coherent architecture.",
+    "Some components identified, but gaps in APIs, data model or data flow.",
+    "Coherent components, APIs and data model that meet the requirements.",
+    "Clean, well-justified architecture with clear data flow and sensible boundaries.",
+  ],
+  scaling: [
+    "Did not address scale or failure.",
+    "Mentioned scaling techniques generically, without fitting them to the bottlenecks.",
+    "Identified bottlenecks and applied fitting caching/sharding/replication/queues.",
+    "Deep, specific handling of scale and failure modes with clear trade-offs.",
+  ],
+  tradeoffs: [
+    "No alternatives considered.",
+    "Named alternatives but didn't compare them meaningfully.",
+    "Compared alternatives and justified the choices made.",
+    "Weighed trade-offs crisply against the requirements and revisited choices when constraints changed.",
+  ],
+  modeling: [
+    "No sensible entities or classes.",
+    "Some entities identified, with unclear responsibilities or relationships.",
+    "Sensible classes, interfaces and relationships covering the use cases.",
+    "Clean model with clear responsibilities that maps naturally to the requirements.",
+  ],
+  principles: [
+    "Design principles not applied.",
+    "Mentioned principles or patterns without applying them correctly.",
+    "Applied SOLID and suitable patterns where they help.",
+    "Applied principles and patterns judiciously and explained why each fits.",
+  ],
+  extensibility: [
+    "Design breaks with any change.",
+    "Some change is possible, but common extensions need rewrites.",
+    "Design accommodates likely changes with limited modification.",
+    "Showed, with examples, how the design absorbs new requirements cleanly.",
+  ],
+  // Projects / resume
+  decisions: [
+    "Could not explain why technologies were chosen.",
+    "Gave generic reasons without comparing alternatives.",
+    "Justified key choices against realistic alternatives.",
+    "Justified choices with specific constraints, measurements and trade-offs.",
+  ],
+  depth: [
+    "Answers stayed at buzzword level.",
+    "Some concrete details, but shallow when probed.",
+    "Concrete, accurate details of how things work and were built.",
+    "Deep, precise understanding that held up under follow-up questions.",
+  ],
+  ownership: [
+    "Unclear what they personally did or decided.",
+    "Some personal contribution, mixed with 'we' and vague ownership.",
+    "Clear about their own actions and decisions.",
+    "Clear personal ownership of significant decisions and their outcomes.",
+  ],
+  reflection: [
+    "No acknowledgement of weaknesses or improvements.",
+    "Acknowledged issues only when pushed, or vaguely.",
+    "Honest about limitations with credible improvements.",
+    "Insightful self-critique with concrete, prioritised improvements.",
+  ],
+  claims: [
+    "Could not back up resume claims.",
+    "Backed some claims, but key ones stayed vague or unsupported.",
+    "Backed the main claims with specifics and evidence.",
+    "Every probed claim was supported with concrete details, numbers or examples.",
+  ],
+  // Fundamentals
+  application: [
+    "Could not connect concepts to real systems.",
+    "Generic examples only.",
+    "Connected concepts to realistic systems or scenarios.",
+    "Rich, specific real-world application, including trade-offs.",
+  ],
+  vocabulary: [
+    "Imprecise or incorrect terminology.",
+    "Mostly correct terms, used loosely.",
+    "Precise, correct terminology.",
+    "Precise terminology used naturally to explain nuances.",
+  ],
+  // Behavioral / HR
+  structure: [
+    "No clear structure.",
+    "Some STAR elements present, but Result or Action unclear.",
+    "Situation, Task, Action and Result all clearly present.",
+    "Tight STAR answers with measurable results and reflection.",
+  ],
+  specificity: [
+    "Hypothetical or generic answers.",
+    "Real examples, but light on concrete detail.",
+    "Real, concrete examples with relevant detail.",
+    "Vivid, specific examples with details that are easy to verify.",
+  ],
+  results: [
+    "No outcomes described.",
+    "Outcomes vague or unmeasured.",
+    "Clear outcomes and some reflection on what was learned.",
+    "Measurable outcomes and genuine lessons applied later.",
+  ],
+  motivation: [
+    "No clear reason for the role or company.",
+    "Generic motivation.",
+    "Clear, genuine reasons tied to the role.",
+    "Specific, well-researched motivation tied to their goals.",
+  ],
+  self_awareness: [
+    "No credible strengths or weaknesses.",
+    "Clichéd strengths/weaknesses without examples.",
+    "Credible strengths and weaknesses with examples.",
+    "Candid, specific self-assessment with evidence of working on weaknesses.",
+  ],
+  professionalism: [
+    "Inappropriate or careless answers.",
+    "Mostly appropriate, occasionally careless.",
+    "Appropriate, considered answers.",
+    "Consistently thoughtful and composed.",
+  ],
+  // Full / company loops
+  problem_solving: [
+    "No structured approach to technical problems.",
+    "Reached answers with heavy prompting.",
+    "Structured approach that reached sound solutions.",
+    "Efficient, well-structured problem solving with alternatives considered.",
+  ],
+  technical_depth: [
+    "Shallow or incorrect technical knowledge.",
+    "Some accurate knowledge, with gaps when probed.",
+    "Accurate, reasonably deep technical knowledge.",
+    "Deep, precise knowledge that held up under follow-ups.",
+  ],
+  projects: [
+    "Could not explain their own work.",
+    "Explained their work at a surface level.",
+    "Explained and justified their own work with specifics.",
+    "Deep, convincing defence of their own work and its trade-offs.",
+  ],
+  fundamentals: [
+    "Core CS knowledge missing or wrong.",
+    "Some core knowledge, with notable gaps.",
+    "Accurate core CS knowledge.",
+    "Accurate and deep core CS knowledge applied to examples.",
+  ],
+};
+
+const GENERIC: Anchors = [
+  "Not demonstrated, or incorrect.",
+  "Partially demonstrated; needed prompting or had notable gaps.",
+  "Solid: meets the bar for this difficulty, with minor gaps.",
+  "Strong: complete, precise and unprompted.",
+];
+
+export const anchorsFor = (id: string): Anchors => ANCHORS[id] ?? GENERIC;
+
+/** The categories that matter most for each round: they count double and gate the verdict. */
+export const CORE: Record<KindId, string[]> = {
+  dsa: ["approach", "correctness"],
+  hld: ["architecture", "scaling"],
+  lld: ["modeling", "principles"],
+  project: ["depth", "decisions"],
+  resume_screen: ["claims", "depth"],
+  fundamentals: ["correctness", "depth"],
+  behavioral: ["specificity", "ownership"],
+  hr: ["motivation", "self_awareness"],
+  full: ["problem_solving", "technical_depth"],
+  company: ["problem_solving", "technical_depth"],
+};
+
+export const isCore = (kind: KindId, id: string) => (CORE[kind] ?? []).includes(id);
+export const weightOf = (kind: KindId, id: string) => (isCore(kind, id) ? 2 : 1);

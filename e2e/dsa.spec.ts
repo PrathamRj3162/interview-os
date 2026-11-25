@@ -95,6 +95,13 @@ test("DSA round: code, run, hint, submit, report", async ({ page }) => {
   await expect(page.getByText(/Accepted · \d+\/\d+/)).toBeVisible();
   await expect(page.getByText("1/3", { exact: true })).toBeVisible(); // hints used
   await expect(page.getByText(/Optimal approach/)).toBeVisible();
+  // Report v2: judge-backed correctness, annotated final code (the fabricated mock note is discarded), next problems
+  await expect(page.getByTestId("verdict")).toBeVisible();
+  await expect(page.getByText("from the judge")).toBeVisible();
+  await expect(page.getByTestId("annotated-code")).toContainText("Mock note: check the empty input here.");
+  await expect(page.getByTestId("annotated-code")).not.toContainText("Fabricated note");
+  await expect(page.getByText(/1 note\(s\) didn't match your code and were discarded/)).toBeVisible();
+  await expect(page.getByText(/Practise next/)).toBeVisible();
 });
 
 test("DSA round: Python runs in the browser (Pyodide); C++ runs on the judge; mock mode has no hints", async ({ page }) => {
