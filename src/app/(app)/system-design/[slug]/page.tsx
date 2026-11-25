@@ -5,7 +5,9 @@ import { Mic } from "lucide-react";
 import { Card, Badge } from "@/components/ui/card";
 import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/supabase/server";
-import { CASE_BY_SLUG } from "@/lib/learn/design";
+import { CASE_BY_SLUG, designMeta } from "@/lib/learn/design";
+import { loadGate } from "@/lib/content/gate";
+import { ReportButton } from "@/components/content/report-button";
 import { MarkReadButton } from "@/components/learn/mark-read";
 import { DESIGN_DIAGRAMS } from "@/lib/learn/design-diagrams";
 import { DesignDiagram } from "@/components/learn/design-diagram";
@@ -30,6 +32,9 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
   const c = CASE_BY_SLUG[slug];
   if (!c) notFound();
   const { supabase, user } = await requireUser();
+  const gate = await loadGate();
+  const meta = designMeta(c);
+  if (!gate.visible(meta)) notFound();
   const { data: p } = await supabase.from("user_progress").select("status").eq("user_id", user.id).eq("item_type", c.kind).eq("item_slug", slug).maybeSingle();
   const practice = `/interview/new?kind=${c.kind}&persona=architect&topic=${encodeURIComponent(`Design: ${c.title} — ${c.prompt}`)}`;
   return (
@@ -37,7 +42,7 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
       <div>
         <Link href="/system-design" className="text-sm text-muted hover:text-text">← System design lab</Link>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">{c.title}</h1>
-        <p className="mt-1 flex gap-1.5"><Badge>{c.kind === "hld" ? "High-level" : "Low-level"}</Badge><Badge>{c.level}</Badge></p>
+        <p className="mt-1 flex gap-1.5"><Badge>{c.kind === "hld" ? "High-level" : "Low-level"}</Badge><Badge>{c.level}</Badge>{gate.preview(meta) && <Badge>Preview — not live</Badge>}</p>
       </div>
       <Card>
         <p className="text-lg">{c.prompt}</p>
@@ -66,7 +71,10 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
       <Section title="Deep dives" items={c.deepDives} />
       <Section title="Trade-offs" items={c.tradeoffs} />
       <Section title="Follow-ups an interviewer may ask" items={c.followUps} />
-      <p className="text-xs text-muted">A reference answer written for Interview OS — other designs can be just as good if the trade-offs are argued well.</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs text-muted">A reference answer written for Interview OS — other designs can be just as good if the trade-offs are argued well.</p>
+        <ReportButton itemId={meta.id} version={meta.version} title={c.title} />
+      </div>
     </article>
   );
 }

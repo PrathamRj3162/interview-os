@@ -72,3 +72,5 @@ export const DESIGN_DIAGRAMS: Record<string, Diagram> = {
     edges: [e("user", "book", "select seats"), e("book", "show", "lookup"), e("show", "seat", "has many"), e("book", "lock", "hold 10 min"), e("book", "pay", "charge"), e("pay", "bk", "on success"), e("bk", "seat", "mark sold", true)],
   },
 };
+
+if (process.env.E2E_FIXTURES === "1") DESIGN_DIAGRAMS["e2e-fixture"] = DESIGN_DIAGRAMS["url-shortener"];

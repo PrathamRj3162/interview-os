@@ -2,8 +2,13 @@
  * System design lab — case studies written for Interview OS. A reference answer, not the only answer:
  * interviewers care about the reasoning and trade-offs. Each case links to a focused practice round.
  */
+import { contentId, type ContentMeta, type ContentStatus } from "@/lib/content/types";
+
 export type DesignCase = {
   slug: string;
+  /** Content version (bump on edits so the change is reviewed again) and shipped status; defaults: 1 / live. */
+  version?: number;
+  status?: ContentStatus;
   title: string;
   kind: "hld" | "lld";
   level: "Starter" | "Intermediate" | "Advanced";
@@ -36,7 +41,7 @@ export const LLD_FRAMEWORK = [
   "Show how the design extends to a new requirement without rewrites.",
 ];
 
-export const DESIGN_CASES: DesignCase[] = [
+const BASE_CASES: DesignCase[] = [
   {
     slug: "url-shortener", title: "URL shortener", kind: "hld", level: "Starter",
     prompt: "Design a service that turns long URLs into short links and redirects visitors.",
@@ -191,4 +196,17 @@ export const DESIGN_CASES: DesignCase[] = [
   },
 ];
 
+/** A draft case that exists only on the local E2E server (E2E_FIXTURES=1), so review-gate tests never touch real content. */
+const E2E_FIXTURE: DesignCase[] = process.env.E2E_FIXTURES === "1"
+  ? [{ ...BASE_CASES[0], slug: "e2e-fixture", title: "E2E fixture case", status: "draft" }]
+  : [];
+
+export const DESIGN_CASES: DesignCase[] = [...BASE_CASES, ...E2E_FIXTURE];
+
 export const CASE_BY_SLUG: Record<string, DesignCase> = Object.fromEntries(DESIGN_CASES.map((c) => [c.slug, c]));
+
+export const designMeta = (c: DesignCase): ContentMeta => ({
+  id: contentId("design-case", c.slug), version: c.version ?? 1, type: "design-case",
+  difficulty: c.level === "Starter" ? "starter" : c.level === "Intermediate" ? "intermediate" : "advanced",
+  tags: [c.kind], status: c.status ?? "live",
+});

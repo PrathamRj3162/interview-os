@@ -31,3 +31,6 @@ Verify: `curl https://<domain>/api/health` → `"database":"configured"` and you
 
 ## 6. Keep Supabase awake
 `.github/workflows/keepalive.yml` calls the `ping()` RPC every 3 days so the free project isn't paused. Add repository secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY` (the public anon key — no service key needed).
+
+## 7. Content admins
+Set `ADMIN_EMAILS` (comma-separated Interview OS login emails) in Vercel. Those accounts can open `/review` to move content between draft, reviewed (admin-only preview) and live, and to resolve user reports.

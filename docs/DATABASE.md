@@ -40,3 +40,8 @@ Static content (problems, lessons, quizzes) is referenced by `slug` and lives in
 ## 0009 — Server-only transcripts
 - `insert/update/delete` on `interview_turns` revoked from `authenticated`; turns are written by the service role in the turn route, scoped by `user_id`. Users can still read their own turns (RLS).
 - `interview_events` gains the `nudge` event type (used to enforce the 2-minute nudge gap).
+
+## 0010 — Content review gate
+- `content_reviews (item_id, version, status draft|reviewed|live, reviewed_by)` — overrides the status shipped in code for one version of a content item. Readable by signed-in users; written only by the server after an `ADMIN_EMAILS` check. Editing an item bumps its version, so it needs review again.
+- `content_reports` — "Report a problem" (reason + optional note), one open report per user per item version; users insert/read only their own rows.
+- `content_hidden_items()` — `security definer`; item versions with open reports from 3+ different users (hidden until an admin resolves them). Exposes no reporter identities.

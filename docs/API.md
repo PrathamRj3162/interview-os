@@ -15,6 +15,8 @@ Mutations are Next.js Server Actions (POST, same-origin, CSRF-protected by Next'
 | reviewCard / addCard / deleteCard / cardsFromReports | app/actions/learn.ts | — | SM-2 review and deck management |
 | generateWeek / addTask / deleteTask / toggleTask | app/actions/tasks.ts | — | Planner; tasks are your own rows (RLS) |
 | addProject / analyseProject / deleteProject | app/actions/projects.ts | title, repo_url… | Public GitHub only; analysis written with the service role |
+| reportProblem | app/actions/content.ts | itemId, version, reason, note? | Any user; one open report per item version |
+| setContentStatus / resolveReports | app/actions/content.ts | itemId, version, status | Admin only (`ADMIN_EMAILS`); failing checks can't go live |
 | deleteAccount | app/actions/profile.ts | confirm="DELETE" | Service role; deletes user (cascade) then storage |
 
 Routes: `GET /api/health` → `{ ok, database, ai: [providerIds], region }`; `?db=1` adds `roundTripsMs` from three `ping()` calls. `POST /api/csp-report` collects CSP violation reports (logged, no body stored). `GET /auth/callback` → email confirm / recovery.
