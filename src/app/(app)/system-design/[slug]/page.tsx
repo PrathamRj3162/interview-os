@@ -7,6 +7,9 @@ import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/supabase/server";
 import { CASE_BY_SLUG } from "@/lib/learn/design";
 import { MarkReadButton } from "@/components/learn/mark-read";
+import { DESIGN_DIAGRAMS } from "@/lib/learn/design-diagrams";
+import { DesignDiagram } from "@/components/learn/design-diagram";
+import { Sketchpad } from "@/components/learn/sketchpad";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   return { title: CASE_BY_SLUG[(await params).slug]?.title ?? "Design case" };
@@ -44,12 +47,22 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
           <MarkReadButton itemType={c.kind} slug={slug} topic={c.title} done={p?.status === "completed"} />
         </div>
       </Card>
+      <details className="rounded-[var(--radius-lg)] border border-border bg-surface">
+        <summary className="cursor-pointer px-5 py-3 font-medium">Sketch your design first</summary>
+        <div className="border-t border-border px-5 py-4"><Sketchpad storageKey={`sketch:${slug}`} /></div>
+      </details>
       <Section title="Functional requirements" items={c.functional} />
       <Section title="Non-functional requirements" items={c.nonFunctional} />
       <Section title="Back-of-the-envelope estimates" items={c.estimates} />
       <Section title={c.kind === "hld" ? "API" : "Key methods"} items={c.api} />
       <Section title={c.kind === "hld" ? "Data model" : "Entities"} items={c.data} />
       <Section title={c.kind === "hld" ? "High-level components" : "Classes, patterns and relationships"} items={c.components} />
+      {DESIGN_DIAGRAMS[slug] && (
+        <details className="rounded-[var(--radius-lg)] border border-border bg-surface">
+          <summary className="cursor-pointer px-5 py-3 font-medium">{c.kind === "hld" ? "Reference architecture diagram" : "Reference class diagram"}</summary>
+          <div className="border-t border-border p-4"><DesignDiagram diagram={DESIGN_DIAGRAMS[slug]} title={c.title} /></div>
+        </details>
+      )}
       <Section title="Deep dives" items={c.deepDives} />
       <Section title="Trade-offs" items={c.tradeoffs} />
       <Section title="Follow-ups an interviewer may ask" items={c.followUps} />

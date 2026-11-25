@@ -5,6 +5,8 @@ import { planWeek, type PlannerInput } from "@/lib/learn/planner";
 import { PATTERNS } from "@/lib/dsa/patterns";
 import { PROBLEMS } from "@/lib/dsa/bank";
 import { FUNDAMENTALS, QUESTION_BY_ID, pickQuestions } from "@/lib/learn/fundamentals";
+import { DESIGN_CASES } from "@/lib/learn/design";
+import { DESIGN_DIAGRAMS } from "@/lib/learn/design-diagrams";
 
 describe("SM-2", () => {
   const now = new Date("2026-11-25T10:00:00Z");
@@ -62,6 +64,18 @@ describe("weekly planner", () => {
 });
 
 describe("learning content integrity", () => {
+  it("every design case has a diagram whose edges point at real nodes on distinct cells", () => {
+    for (const c of DESIGN_CASES) {
+      const d = DESIGN_DIAGRAMS[c.slug];
+      expect(d, c.slug).toBeTruthy();
+      const ids = new Set(d.nodes.map((n) => n.id));
+      expect(ids.size, c.slug).toBe(d.nodes.length);
+      const cells = new Set(d.nodes.map((n) => `${n.col},${n.row}`));
+      expect(cells.size, `${c.slug}: overlapping nodes`).toBe(d.nodes.length);
+      for (const e of d.edges) { expect(ids.has(e.from), `${c.slug}: ${e.from}`).toBe(true); expect(ids.has(e.to), `${c.slug}: ${e.to}`).toBe(true); }
+      for (const n of d.nodes) expect(n.label.length, `${c.slug}: ${n.label}`).toBeLessThanOrEqual(40);
+    }
+  });
   it("every pattern links to real problem tags", () => {
     const tags = new Set(PROBLEMS.flatMap((p) => p.topics));
     for (const p of PATTERNS) {
@@ -69,12 +83,12 @@ describe("learning content integrity", () => {
       for (const t of p.topics) expect(tags.has(t), `${p.slug}: ${t}`).toBe(true);
     }
   });
-  it("fundamentals bank: 4 topics × 15, unique ids, valid answers, explanations", () => {
+  it("fundamentals bank: 4 topics × 25, unique ids, valid answers, explanations", () => {
     expect(FUNDAMENTALS).toHaveLength(4);
     const ids = FUNDAMENTALS.flatMap((t) => t.questions.map((q) => q.id));
     expect(new Set(ids).size).toBe(ids.length);
     for (const t of FUNDAMENTALS) {
-      expect(t.questions).toHaveLength(15);
+      expect(t.questions).toHaveLength(25);
       for (const q of t.questions) {
         expect(q.answer).toBeGreaterThanOrEqual(0);
         expect(q.answer).toBeLessThan(q.options.length);
@@ -85,6 +99,7 @@ describe("learning content integrity", () => {
     expect(QUESTION_BY_ID.os1.topic).toBe("os");
     const pick = pickQuestions(FUNDAMENTALS[0]);
     expect(new Set(pick.map((q) => q.id)).size).toBe(10);
+    for (const q of pick) expect([...q.order].sort()).toEqual(q.options.map((_, i) => i));
   });
 });
 

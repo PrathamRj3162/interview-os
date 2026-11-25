@@ -89,6 +89,17 @@ test("system design lab: reveal sections and practise with a focused topic", asy
   await page.getByRole("link", { name: /URL shortener/ }).click();
   await page.getByText("Back-of-the-envelope estimates").click();
   await expect(page.getByText(/62⁷/)).toBeVisible();
+  await page.getByText("Reference architecture diagram").click();
+  const diagram = page.getByTestId("design-diagram");
+  await expect(diagram.getByRole("img", { name: /Reference architecture for URL shortener/ })).toBeVisible();
+  await expect(diagram).toContainText("Redis cache");
+  // Sketchpad: draw a box, reload, the drawing is restored from this device.
+  await page.getByText("Sketch your design first").click();
+  const pad = page.getByTestId("sketchpad");
+  await pad.getByRole("button", { name: "Box" }).click();
+  const box = (await pad.locator("canvas").boundingBox())!;
+  await page.mouse.move(box.x + 40, box.y + 40); await page.mouse.down(); await page.mouse.move(box.x + 200, box.y + 120, { steps: 5 }); await page.mouse.up();
+  expect(await page.evaluate(() => Object.keys(localStorage).some((k) => k === "sketch:url-shortener"))).toBe(true);
   await page.getByTestId("practise-design").click();
   await expect(page.getByText(/Focus: Design: URL shortener/)).toBeVisible();
 });

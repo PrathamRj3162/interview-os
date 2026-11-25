@@ -9,7 +9,7 @@ import { gradeQuiz } from "@/app/actions/learn";
 
 export const metadata: Metadata = { title: "Quiz" };
 
-/** Ten random questions; the options are sent without the answer key and graded on the server. */
+/** Ten random questions with shuffled options; sent without the answer key and graded on the server. */
 export default async function QuizPage({ params }: { params: Promise<{ topic: string }> }) {
   const { topic } = await params;
   const t = TOPIC_BY_SLUG[topic];
@@ -32,7 +32,7 @@ export default async function QuizPage({ params }: { params: Promise<{ topic: st
               <fieldset>
                 <legend className="font-medium"><span className="mr-2 text-muted">{i + 1}.</span>{q.q}</legend>
                 <div className="mt-3 grid gap-2">
-                  {q.options.map((o, k) => (
+                  {q.order.map((k) => [q.options[k], k] as const).map(([o, k]) => (
                     <label key={k} className="flex cursor-pointer items-start gap-2 rounded-lg border border-border p-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-accent-soft">
                       <input type="radio" name={`a_${q.id}`} value={k} className="mt-0.5 accent-[var(--accent)]" />
                       <span>{o}</span>
