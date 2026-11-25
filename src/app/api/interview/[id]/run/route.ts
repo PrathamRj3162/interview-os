@@ -7,6 +7,7 @@ import { grade } from "@/lib/dsa/grade";
 import { STRESS_BUDGET_MS } from "@/lib/dsa/stress";
 import { assertJudgeQuota, JudgeQuotaError, logEvent, saveWorkspace, summariseOutcome, type Workspace } from "@/lib/dsa/server";
 import { codeBody, loadDsaRoute } from "@/lib/dsa/route-helpers";
+import { createAdminClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
@@ -49,7 +50,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (mode === "submit") {
     const events = await supabase.from("interview_events").select("type").eq("interview_id", id).eq("type", "hint");
-    const ins = await supabase.from("submissions").insert({
+    // Submissions feed XP and public stats, so only the server may insert them (migration 0005).
+    const ins = await createAdminClient().from("submissions").insert({
       user_id: user.id, interview_id: id, problem_slug: problem.slug, language, code,
       status: outcome.status, passed: outcome.passed, total: outcome.total, runtime_ms: outcome.timeMs,
       hints_used: Math.min(3, events.data?.length ?? 0),

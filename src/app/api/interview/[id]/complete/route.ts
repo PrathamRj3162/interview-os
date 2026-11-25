@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser, createAdminClient } from "@/lib/supabase/server";
 import { AIUnavailableError } from "@/lib/ai";
 import { recordUsage } from "@/lib/ai/quota";
 import { evaluateInterview } from "@/lib/interview/engine";
@@ -46,17 +46,21 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   if (iv.status === "evaluating") return NextResponse.json({ status: "evaluating" }, { status: 202 });
   if (iv.status === "abandoned") return NextResponse.json({ status: "abandoned" });
 
+  // Status, report and score are server-only columns (migration 0005): written with the service role,
+  // always scoped to this user's own interview (ownership was just checked through RLS above).
+  const admin = createAdminClient();
+  const own = () => admin.from("mock_interviews");
   const turns = await loadTurns(supabase, id);
   if (pairTurns(turns).length === 0) {
-    await supabase.from("mock_interviews").update({ status: "abandoned", ended_at: new Date().toISOString() })
-      .eq("id", id).in("status", ["in_progress", "evaluation_failed"]);
+    await own().update({ status: "abandoned", ended_at: new Date().toISOString() })
+      .eq("id", id).eq("user_id", user.id).in("status", ["in_progress", "evaluation_failed"]);
     return NextResponse.json({ status: "abandoned", message: "No answers were given, so there's nothing to evaluate." });
   }
 
   const endedAt = iv.ended_at ?? new Date().toISOString();
-  const lock = await supabase.from("mock_interviews")
+  const lock = await own()
     .update({ status: "evaluating", ended_at: endedAt })
-    .eq("id", id).in("status", ["in_progress", "evaluation_failed"])
+    .eq("id", id).eq("user_id", user.id).in("status", ["in_progress", "evaluation_failed"])
     .select("id");
   if (!lock.data?.length) return NextResponse.json({ status: "evaluating" }, { status: 202 });
 
@@ -117,9 +121,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     const report = await evaluateInterview(iv, turns, ctx);
     if (dsaReport) report.dsa = dsaReport;
     await recordUsage(supabase, user.id, "interview_report", report.provider, report.model);
-    const done = await supabase.from("mock_interviews")
+    const done = await own()
       .update({ status: "completed", report, overall_score: report.overall })
-      .eq("id", id).eq("status", "evaluating");
+      .eq("id", id).eq("user_id", user.id).eq("status", "evaluating");
     if (done.error) throw new Error("save failed");
 
     // Feed the study plan: each priority becomes a dated task with the reason attached.
@@ -142,7 +146,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ status: "completed" });
   } catch (e) {
     console.error("[interview-complete]", e instanceof Error ? e.message : e);
-    await supabase.from("mock_interviews").update({ status: "evaluation_failed" }).eq("id", id).eq("status", "evaluating");
+    await own().update({ status: "evaluation_failed" }).eq("id", id).eq("user_id", user.id).eq("status", "evaluating");
     const message = e instanceof AIUnavailableError ? e.message : "Report generation failed. Your transcript is saved — you can retry.";
     return NextResponse.json({ status: "evaluation_failed", error: message }, { status: 503 });
   }
