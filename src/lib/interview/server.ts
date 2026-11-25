@@ -6,10 +6,10 @@ import type { Turn } from "./analysis";
 export async function loadInterview(supabase: SupabaseClient, id: string) {
   const { data } = await supabase
     .from("mock_interviews")
-    .select("id, user_id, kind, difficulty, persona, mode, input_mode, company, language, duration_min, resume_id, status, started_at, ended_at, overall_score, report, problem_slug, phase, workspace, user_rating, rating_note")
+    .select("id, user_id, kind, difficulty, persona, mode, input_mode, company, language, duration_min, resume_id, status, started_at, ended_at, overall_score, report, problem_slug, phase, workspace, user_rating, rating_note, topic, project_id")
     .eq("id", id)
     .maybeSingle();
-  return data as (InterviewRow & { user_id: string; resume_id: string | null; status: string; input_mode: string; ended_at: string | null; overall_score: number | null; report: unknown; problem_slug: string | null; phase: string | null; workspace: unknown; user_rating: number | null; rating_note: string | null }) | null;
+  return data as (InterviewRow & { user_id: string; resume_id: string | null; status: string; input_mode: string; ended_at: string | null; overall_score: number | null; report: unknown; problem_slug: string | null; phase: string | null; workspace: unknown; user_rating: number | null; rating_note: string | null; topic: string | null; project_id: string | null }) | null;
 }
 
 export async function loadTurns(supabase: SupabaseClient, id: string): Promise<(Turn & { id: number; created_at: string })[]> {
@@ -18,11 +18,13 @@ export async function loadTurns(supabase: SupabaseClient, id: string): Promise<(
 }
 
 /** Shared candidate context: profile + resume claims + projects (the cross-module link). */
-export async function loadCandidateContext(supabase: SupabaseClient, userId: string, resumeId: string | null): Promise<CandidateContext> {
+export async function loadCandidateContext(supabase: SupabaseClient, userId: string, resumeId: string | null, projectId: string | null = null): Promise<CandidateContext> {
   const [{ data: profile }, claimsRes, { data: projects }, analysisRes] = await Promise.all([
     supabase.from("profiles").select("full_name, target_role, experience_level").eq("id", userId).maybeSingle(),
     resumeId ? supabase.from("resume_claims").select("claim, risk, questions").eq("resume_id", resumeId) : Promise.resolve({ data: [] as { claim: string; risk: string | null; questions: { concern?: string } }[] }),
-    supabase.from("projects").select("title, description, technologies").eq("user_id", userId).limit(8),
+    projectId
+      ? supabase.from("projects").select("title, description, technologies, analysis").eq("user_id", userId).eq("id", projectId).limit(1)
+      : supabase.from("projects").select("title, description, technologies").eq("user_id", userId).limit(8),
     resumeId ? supabase.from("resume_analyses").select("rule_scores").eq("resume_id", resumeId).order("created_at", { ascending: false }).limit(1) : Promise.resolve({ data: [] as { rule_scores: { stats?: { skillsFound?: string[] } } }[] }),
   ]);
   const order = { high: 0, medium: 1, low: 2 } as Record<string, number>;
@@ -35,7 +37,11 @@ export async function loadCandidateContext(supabase: SupabaseClient, userId: str
     role: profile?.target_role ?? null,
     experience: profile?.experience_level ?? null,
     claims,
-    projects: (projects ?? []) as CandidateContext["projects"],
+    projects: ((projects ?? []) as (CandidateContext["projects"][number] & { analysis?: { summary?: string; architecture?: string } | null })[]).map((p) => ({
+      title: p.title, technologies: p.technologies,
+      // A project analysed from its GitHub repo carries a summary of what the code actually contains.
+      description: [p.description, p.analysis?.summary, p.analysis?.architecture].filter(Boolean).join(" ").slice(0, 1500) || null,
+    })),
     skills,
   };
 }

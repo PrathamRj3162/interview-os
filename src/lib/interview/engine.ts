@@ -12,6 +12,7 @@ import { locateQuote, numberLines, validateCodeNotes, type CodeNote, type Metric
 export type InterviewRow = {
   id: string; kind: KindId; difficulty: Difficulty; persona: PersonaId; mode: "mock" | "practice";
   company: string | null; language: string | null; duration_min: number; started_at: string;
+  topic?: string | null;
 };
 
 export type CandidateContext = {
@@ -66,6 +67,7 @@ function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: numb
     `Difficulty: ${DIFFICULTIES[iv.difficulty]}. Adapt: go deeper after strong answers; after weak ones, probe the gap once more before moving on.`,
     iv.company ? (companyPrompt(iv.company) || `Target company: ${iv.company}. You may emulate its publicly known interview style. Never claim a question was actually asked at that company.`) : "",
     iv.language ? `Candidate's preferred programming language: ${iv.language}.` : "",
+    iv.topic ? `The candidate chose this focus for the round — base the main question on it: ${untrusted("requested_topic", iv.topic)}` : "",
     `Time remaining: about ${Math.max(0, Math.round(minutesLeft))} minutes of ${iv.duration_min}.`,
     "",
     "HOW TO BEHAVE (strict):",

@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       content = `[Hint] ${r.data.hint}`;
       ({ provider, model } = r);
     } else {
-      const ctx = await loadCandidateContext(supabase, user.id, iv.resume_id);
+      const ctx = await loadCandidateContext(supabase, user.id, iv.resume_id, iv.project_id ?? null);
       let prompt: DsaPrompt | undefined;
       let events: Awaited<ReturnType<typeof loadEvents>> = [];
       // Deterministic signals (candidate replied, started coding, time) apply before the model speaks,

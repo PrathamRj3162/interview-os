@@ -13,7 +13,7 @@ import { COMPANY_BY_NAME } from "@/lib/interview/companies";
 
 export const metadata: Metadata = { title: "New interview" };
 
-export default async function NewInterviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; resume?: string; problem?: string; difficulty?: string; persona?: string; company?: string }> }) {
+export default async function NewInterviewPage({ searchParams }: { searchParams: Promise<{ kind?: string; resume?: string; problem?: string; difficulty?: string; persona?: string; company?: string; mode?: string; topic?: string; project?: string }> }) {
   const sp = await searchParams;
   const { supabase, user } = await requireUser();
   const [profile, { data: resumes }, { data: past }] = await Promise.all([
@@ -40,7 +40,7 @@ export default async function NewInterviewPage({ searchParams }: { searchParams:
       {aiStatus().length === 0 ? (
         <Card className="text-sm text-muted">Mock interviews need an AI provider, and none is configured on this server right now.</Card>
       ) : (
-        <SetupForm suggestions={suggestions} defaults={{ kind, problem: problem?.slug ?? null, persona: askedPersona, ...(askedDifficulty ? { difficulty: askedDifficulty } : problem ? { difficulty: problem.difficulty } : {}), language: profile?.preferred_language ?? null, company: (sp.company && COMPANY_BY_NAME[sp.company] ? sp.company : null) ?? profile?.target_companies?.[0] ?? null, resumeId }} resumes={list} />
+        <SetupForm suggestions={suggestions} defaults={{ kind, mode: sp.mode === "practice" ? "practice" : "mock", topic: sp.topic?.slice(0, 200) ?? null, projectId: sp.project && /^[0-9a-f-]{36}$/.test(sp.project) ? sp.project : null, problem: problem?.slug ?? null, persona: askedPersona, ...(askedDifficulty ? { difficulty: askedDifficulty } : problem ? { difficulty: problem.difficulty } : {}), language: profile?.preferred_language ?? null, company: (sp.company && COMPANY_BY_NAME[sp.company] ? sp.company : null) ?? profile?.target_companies?.[0] ?? null, resumeId }} resumes={list} />
       )}
     </div>
   );

@@ -60,6 +60,15 @@ export function mockReply(messages: ChatMessage[]): string {
 
   if (system.includes('{"hint"')) return JSON.stringify({ hint: "Consider the constraints again." });
 
+  if (system.includes("defend a software project")) {
+    const repo = /Repository: ([^\s]+)/.exec(inner(last))?.[1] ?? "the repository";
+    return JSON.stringify({
+      summary: `Mock summary of ${repo}.`, architecture: "Mock architecture paragraph.",
+      questions: [{ question: `Why is ${repo} structured this way?`, probing: "Design reasoning." }, { question: "What would you test first?", probing: "Testing." }],
+      verify: ["Mock claim to verify"],
+    });
+  }
+
   if (system.includes("LIVE CODING ROUND")) {
     const phase = /CURRENT PHASE: (\w+)/.exec(system)?.[1] ?? "clarify";
     const lines: Record<string, string> = {

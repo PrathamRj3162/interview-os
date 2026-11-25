@@ -23,6 +23,9 @@ const schema = z.object({
   company: z.enum(COMPANIES).nullable(),
   resume_id: z.uuid().nullable(),
   problem_slug: z.string().refine((s) => s in PROBLEM_BY_SLUG, "Unknown problem").nullable(),
+  /** Focus for this interview, e.g. a system design lab topic. */
+  topic: z.string().trim().max(200).nullable(),
+  project_id: z.uuid().nullable(),
 });
 
 export async function createInterview(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -33,6 +36,7 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
     duration_min: fd.get("duration_min"), mode: fd.get("mode"), input_mode: fd.get("input_mode"),
     language: blank(fd.get("language")), company: blank(fd.get("company")), resume_id: blank(fd.get("resume_id")),
     problem_slug: blank(fd.get("problem_slug")),
+    topic: blank(fd.get("topic")), project_id: blank(fd.get("project_id")),
   });
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues), message: "Please check the highlighted options." };
 
@@ -42,6 +46,10 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
     if (!data) return { message: "That resume wasn't found." };
   }
 
+  if (parsed.data.project_id) {
+    const { data } = await supabase.from("projects").select("id").eq("id", parsed.data.project_id).maybeSingle();
+    if (!data) return { message: "That project wasn't found." };
+  }
   const { problem_slug: chosen, ...fields } = parsed.data;
   const row: Record<string, unknown> = { ...fields, user_id: user.id };
 

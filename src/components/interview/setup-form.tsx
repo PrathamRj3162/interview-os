@@ -20,7 +20,7 @@ const on = "border-accent bg-accent-soft";
 const off = "border-border bg-surface hover:border-border-strong hover:bg-surface-2";
 
 export function SetupForm({ defaults, resumes, suggestions }: {
-  defaults: { kind: KindId; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
+  defaults: { kind: KindId; mode?: "mock" | "practice"; topic?: string | null; projectId?: string | null; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
   resumes: { id: string; file_name: string; analysed: boolean }[];
   /** Suggested difficulty per round, from recent verdicts. */
   suggestions?: Partial<Record<KindId, { difficulty: Difficulty; reason: string }>>;
@@ -34,7 +34,7 @@ export function SetupForm({ defaults, resumes, suggestions }: {
   const suggestion = suggestions?.[kind];
   // Follow the suggestion when the round changes, until the candidate picks a difficulty themselves.
   useEffect(() => { if (!touchedDifficulty && suggestion) setDifficulty(suggestion.difficulty); }, [kind, touchedDifficulty, suggestion]); // eslint-disable-line react-hooks/set-state-in-effect -- derived default
-  const [mode, setMode] = useState<"mock" | "practice">("mock");
+  const [mode, setMode] = useState<"mock" | "practice">(defaults.mode ?? "mock");
   const [input, setInput] = useState<"text" | "voice">("voice");
   const [duration, setDuration] = useState("20");
   const [resumeId, setResumeId] = useState(defaults.resumeId ?? "none");
@@ -47,6 +47,9 @@ export function SetupForm({ defaults, resumes, suggestions }: {
 
   return (
     <form action={action} className="space-y-6">
+      {defaults.topic && <input type="hidden" name="topic" value={defaults.topic} />}
+      {defaults.projectId && <input type="hidden" name="project_id" value={defaults.projectId} />}
+      {defaults.topic && <p className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-sm">Focus: <span className="font-medium">{defaults.topic}</span></p>}
       {/* Stepper */}
       <ol className="flex items-center gap-2 text-sm" aria-label="Setup progress">
         {STEPS.map((s, i) => (
