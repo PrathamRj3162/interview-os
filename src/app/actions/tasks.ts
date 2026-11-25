@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/supabase/server";
 import { z } from "zod";
-import { getCurrentUser } from "@/lib/supabase/server";
+import { getCurrentUser, createAdminClient } from "@/lib/supabase/server";
 import { planWeek } from "@/lib/learn/planner";
 import { PATTERNS } from "@/lib/dsa/patterns";
 import { PROBLEMS, PROBLEM_BY_SLUG } from "@/lib/dsa/bank";
@@ -57,7 +57,8 @@ export async function generateWeek(): Promise<{ ok: boolean; added: number; mess
   if (!tasks.length) return { ok: true, added: 0, message: "Your week is already planned — nothing new to add." };
   const planId = await activePlanId(supabase, user.id, { source: "planner", start });
   if (!planId) return { ok: false, added: 0, message: "Couldn't create a plan." };
-  const { error } = await supabase.from("study_tasks").insert(tasks.map((t) => ({ ...t, plan_id: planId, user_id: user.id })));
+  // Planner tasks earn XP when done, so they're written by the server with source = planner (migration 0007).
+  const { error } = await createAdminClient().from("study_tasks").insert(tasks.map((t) => ({ ...t, plan_id: planId, user_id: user.id, source: "planner" })));
   revalidatePath("/planner"); revalidatePath("/dashboard");
   return error ? { ok: false, added: 0, message: "Couldn't save the plan." } : { ok: true, added: tasks.length, message: `Planned ${tasks.length} task${tasks.length === 1 ? "" : "s"} for the next 7 days.` };
 }

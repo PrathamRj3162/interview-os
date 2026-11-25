@@ -11,7 +11,8 @@ export async function loadActivity(supabase: SupabaseClient) {
       .select("id, kind, difficulty, overall_score, ended_at, started_at, answers:report->communication->>answers, verdict:report->verdict->>level")
       .eq("status", "completed").order("ended_at").limit(2000),
     supabase.from("submissions").select("problem_slug, status, hints_used, created_at, language, solve_seconds").order("created_at").limit(5000),
-    supabase.from("study_tasks").select("done_at").not("done_at", "is", null).limit(5000),
+    // Only tasks the platform created (from reports and the planner) earn XP; your own tasks don't.
+    supabase.from("study_tasks").select("done_at").not("done_at", "is", null).neq("source", "user").limit(5000),
   ]);
   const interviews: InterviewIn[] = (ivs.data ?? []).map((r) => ({
     id: r.id, kind: r.kind, difficulty: r.difficulty,

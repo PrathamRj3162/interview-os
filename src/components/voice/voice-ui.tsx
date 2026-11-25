@@ -36,12 +36,13 @@ export function VoiceSettingsDialog({ open, onClose, voice }: { open: boolean; o
     <Dialog open={open} onClose={onClose} title="Voice settings">
       <div className="space-y-5">
         <Choice name="Listening (speech-to-text)" value={s.stt} onChange={(v) => voice.setSettings({ stt: v })} options={[
-          { value: "browser", label: "Browser", hint: "Your browser's speech recognition. Free, live words as you speak. In Chrome, audio goes to Google's speech service." },
+          { value: "browser", label: "Browser", hint: "Your browser's speech recognition. Live words as you speak. In Chrome, audio goes to Google's speech service; not available in Firefox." },
+          { value: "local", label: "Whisper (on this device)", hint: `Free and private: audio never leaves your device. One-time ~40–80 MB download; text appears after each pause.${voice.sttPct != null && voice.sttPct < 100 ? ` Downloading… ${voice.sttPct}%` : voice.sttPct === 100 ? " Ready." : ""}` },
           { value: "whisper", label: "Whisper (server)", disabled: !voice.sttServer, hint: voice.sttServer ? "More accurate on technical words. Each answer's audio is sent to Groq; counts toward your daily AI limit." : "Not configured on this deployment (needs a free Groq API key)." },
         ]} />
         <Choice name="Interviewer voice" value={s.tts} onChange={(v) => voice.setSettings({ tts: v })} options={[
           { value: "browser", label: "Browser voice", hint: "Instant. Quality depends on your device's voices." },
-          { value: "kokoro", label: "Natural voice (Kokoro, on-device)", hint: "Runs entirely in your browser. One-time ~90 MB download; slower on older devices." },
+          { value: "kokoro", label: "Natural voice (Kokoro, on-device)", hint: `Runs entirely in your browser. One-time ~90 MB download (cached), starts downloading as soon as you pick it; if your device can't keep up, the browser voice takes over automatically.${voice.tts.kokoroPct != null && voice.tts.kokoroPct < 100 ? ` Downloading… ${voice.tts.kokoroPct}%` : voice.tts.kokoroPct === 100 ? " Ready." : ""}` },
         ]} />
         <div className="space-y-3">
           <label className="flex items-start gap-2 text-sm">

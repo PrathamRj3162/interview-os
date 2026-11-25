@@ -5,9 +5,11 @@ import { useSpeechRecognition, type MicState } from "@/components/interview/use-
 import { createVad, rmsOf } from "@/lib/voice/vad";
 import { splitSentences } from "@/lib/voice/sentences";
 import { loadKokoro, synthKokoro } from "./kokoro";
+import { loadLocalWhisper, transcribeLocal } from "./whisper-local";
 
 export type VoiceSettings = {
-  stt: "browser" | "whisper";
+  /** browser = Web Speech API · local = Whisper on this device · whisper = Whisper on the server (Groq key needed). */
+  stt: "browser" | "local" | "whisper";
   tts: "browser" | "kokoro";
   /** Send automatically after you stop talking (with a short cancellable countdown). */
   autoSend: boolean;
@@ -24,7 +26,10 @@ const AUTO_SEND_MS = 1500;
 export type Latency = { sttMs: number | null; aiMs: number | null; ttsMs: number | null };
 
 function loadSettings(): VoiceSettings {
-  try { return { ...DEFAULT_VOICE, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }; } catch { return DEFAULT_VOICE; }
+  // Browsers without built-in recognition (e.g. Firefox) default to on-device Whisper.
+  const hasSR = typeof window !== "undefined" && ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  const base = hasSR ? DEFAULT_VOICE : { ...DEFAULT_VOICE, stt: "local" as const };
+  try { return { ...base, ...JSON.parse(localStorage.getItem(KEY) ?? "{}") }; } catch { return base; }
 }
 
 /**
@@ -42,7 +47,9 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
   const setSettings = useCallback((patch: Partial<VoiceSettings>) => {
     setSettingsState((s) => { const n = { ...s, ...patch }; try { localStorage.setItem(KEY, JSON.stringify(n)); } catch { /* ignore */ } return n; });
   }, []);
-  const useWhisper = opts.sttServer && settings.stt === "whisper";
+  // Record-and-transcribe mode (Whisper on the server or on this device) instead of live browser recognition.
+  const useWhisper = (opts.sttServer && settings.stt === "whisper") || settings.stt === "local";
+  const [sttPct, setSttPct] = useState<number | null>(null);
 
   const cb = useRef(opts);
   useEffect(() => { cb.current = opts; });
@@ -63,6 +70,12 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
   const [transcribing, setTranscribing] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   const [autoSendIn, setAutoSendIn] = useState<number | null>(null);
+  // Start downloading the on-device models as soon as they're chosen, not at the first answer.
+  useEffect(() => {
+    if (settings.stt !== "local") return;
+    setSttPct((p) => p ?? 0); // eslint-disable-line react-hooks/set-state-in-effect -- progress of a background download
+    loadLocalWhisper((p) => setSttPct(p)).then(() => setSttPct(100)).catch(() => { setSttPct(null); setMicError("On-device speech recognition couldn't load (offline or blocked). Switch the listening engine in voice settings."); });
+  }, [settings.stt]);
   const media = useRef<{ stream: MediaStream; ctx: AudioContext; timer: number; rec: MediaRecorder | null } | null>(null);
   const vad = useRef(createVad());
   const autoTimer = useRef<number | null>(null);
@@ -90,6 +103,12 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
     setTranscribing(true);
     const t0 = Date.now();
     try {
+      if (settingsRef.current.stt === "local") {
+        const text = await transcribeLocal(blob);
+        setLatency((l) => ({ ...l, sttMs: Date.now() - t0 }));
+        if (text) { cb.current.onText(text); scheduleAutoSend(); }
+        return;
+      }
       const form = new FormData();
       form.append("audio", blob, "answer.webm");
       const res = await fetch("/api/voice/stt", { method: "POST", body: form });
@@ -97,7 +116,7 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
       if (!res.ok) { setMicError(data.error ?? "Speech-to-text failed."); return; }
       setLatency((l) => ({ ...l, sttMs: Date.now() - t0 }));
       if (data.text) { cb.current.onText(data.text); scheduleAutoSend(); }
-    } catch { setMicError("Speech-to-text failed (network). You can keep typing."); }
+    } catch { setMicError(settingsRef.current.stt === "local" ? "On-device transcription failed. You can keep typing." : "Speech-to-text failed (network). You can keep typing."); }
     finally { setTranscribing(false); }
   }, [scheduleAutoSend]);
 
@@ -242,7 +261,17 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
     });
   }, []);
 
-  const speakKokoro = useCallback(async (chunks: string[], token: number, t0: number, onDone?: () => void) => {
+  useEffect(() => {
+    if (settings.tts !== "kokoro") return;
+    setKokoroPct((p) => p ?? 0); // eslint-disable-line react-hooks/set-state-in-effect -- progress of a background download
+    loadKokoro((p) => setKokoroPct(p)).then(() => setKokoroPct(100)).catch(() => {});
+  }, [settings.tts]);
+
+  const speakKokoro = useCallback(async (input: string[], token: number, t0: number, onDone?: () => void) => {
+    // A shorter first chunk means the first word is heard sooner.
+    const chunks = input[0].length > 80 && /,\s/.test(input[0].slice(20, 120))
+      ? [input[0].slice(0, input[0].indexOf(", ", 20) + 1), input[0].slice(input[0].indexOf(", ", 20) + 2), ...input.slice(1)]
+      : input;
     try {
       if (kokoroPct === null) setKokoroPct(0);
       await loadKokoro((p) => setKokoroPct(p));
@@ -259,10 +288,23 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
     let first = true;
     // Generate sentence i+1 while sentence i plays.
     let next = synthKokoro(chunks[0]);
+    let slow = 0;
     for (let i = 0; i < chunks.length; i++) {
       let out: { audio: Float32Array; rate: number };
+      const g0 = performance.now();
       try { out = await next; } catch { break; }
       if (token !== playToken.current) return;
+      // Slower than real time twice in a row → this device can't keep up: finish with the browser voice.
+      const genMs = performance.now() - g0, audioMs = (out.audio.length / out.rate) * 1000;
+      slow = genMs > audioMs * 1.3 && i > 0 ? slow + 1 : 0;
+      if (slow >= 2 && i + 1 < chunks.length) {
+        setTtsNote("The natural voice is slower than real time on this device, so the browser voice is used from now on. You can switch back in voice settings.");
+        setSettings({ tts: "browser" });
+        const rest = chunks.slice(i);
+        const waitMs = Math.max(0, (at - ctx.currentTime) * 1000);
+        window.setTimeout(() => { if (token === playToken.current) speakBrowser(rest, token, t0, onDone); }, waitMs);
+        return;
+      }
       if (i + 1 < chunks.length) next = synthKokoro(chunks[i + 1]);
       const buffer = ctx.createBuffer(1, out.audio.length, out.rate);
       buffer.copyToChannel(out.audio as Float32Array<ArrayBuffer>, 0);
@@ -304,6 +346,7 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
       level, userSpeaking, transcribing,
     },
     tts: { speak, cancel, speaking, supported: ttsSupported, note: ttsNote, kokoroPct },
+    sttPct,
     autoSendIn, cancelAutoSend,
   };
 }

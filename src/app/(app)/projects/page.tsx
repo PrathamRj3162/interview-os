@@ -34,7 +34,7 @@ export default async function ProjectsPage() {
                   {p.technologies.length > 0 && <div className="flex flex-wrap gap-1">{p.technologies.slice(0, 8).map((t: string) => <Badge key={t}>{t}</Badge>)}</div>}
                   <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
                     <Link href={`/interview/new?kind=project&persona=skeptic&project=${p.id}`} className={buttonClasses("primary", "sm")}><Mic className="size-4" aria-hidden />Practise a deep dive</Link>
-                    {a?.questions ? <Link href={`/projects/${p.id}`} className={buttonClasses("secondary", "sm")}>{a.questions.length} likely questions</Link> : <AnalyseButton id={p.id} hasRepo={Boolean(p.repo_url)} />}
+                    {a?.questions ? <Link href={`/projects/${p.id}`} className={buttonClasses("secondary", "sm")}>{a.questions.length} likely questions</Link> : <AnalyseButton id={p.id} hasRepo={Boolean(p.repo_url)} repoUrl={p.repo_url} />}
                   </div>
                 </Card>
               </li>

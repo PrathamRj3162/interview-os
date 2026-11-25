@@ -296,6 +296,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
         )}
         {mic.transcribing && <p role="status" className="mt-1 text-xs text-muted">Transcribing…</p>}
         {tts.kokoroPct != null && tts.kokoroPct < 100 && <p role="status" className="mt-1 text-xs text-muted">Loading the natural voice on your device… {tts.kokoroPct}% (one-time download, about 90 MB)</p>}
+        {voice.sttPct != null && voice.sttPct < 100 && <p role="status" className="mt-1 text-xs text-muted">Loading on-device speech recognition… {voice.sttPct}% (one-time download)</p>}
         {tts.note && <p className="mt-1 text-xs text-warning">{tts.note}</p>}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {mic.supported ? (
@@ -344,7 +345,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
         </div>
         {p.inputMode === "voice" && (
           <p className="mt-2 text-[11px] text-muted">
-            {voice.settings.stt === "whisper" && p.sttServer ? "Listening with Whisper: each answer's audio is sent to Groq for transcription and not stored by Interview OS." : "Listening with your browser's speech recognition (in Chrome, Google's speech service)."}{" "}
+            {voice.settings.stt === "whisper" && p.sttServer ? "Listening with Whisper: each answer's audio is sent to Groq for transcription and not stored by Interview OS." : voice.settings.stt === "local" ? "Listening with Whisper on your device: audio never leaves it." : "Listening with your browser's speech recognition (in Chrome, Google's speech service)."}{" "}
             {voice.settings.tts === "kokoro" ? "The interviewer's natural voice runs on your device." : "The interviewer uses your browser's voice."}{" "}
             {voice.settings.autoSend ? "Your answer sends after a pause (you can cancel)." : "Press Send when you're done."} Interview OS stores only the text transcript. <Link href="/mic-check" className="underline" target="_blank">Mic check</Link>
           </p>

@@ -10,12 +10,12 @@ const WORKER = `
 let tts = null;
 async function load() {
   const { KokoroTTS } = await import("https://cdn.jsdelivr.net/npm/kokoro-js@${KOKORO_VERSION}/+esm");
-  const webgpu = typeof navigator !== "undefined" && "gpu" in navigator && !!(await navigator.gpu?.requestAdapter?.().catch(() => null));
+  // Always the ~90 MB 8-bit model on WASM: the fp32 WebGPU build is ~330 MB, too big a download for this.
   tts = await KokoroTTS.from_pretrained("onnx-community/Kokoro-82M-v1.0-ONNX", {
-    dtype: webgpu ? "fp32" : "q8", device: webgpu ? "webgpu" : "wasm",
+    dtype: "q8", device: "wasm",
     progress_callback: (p) => { if (p && p.status === "progress" && p.file && p.file.endsWith(".onnx")) self.postMessage({ type: "progress", pct: Math.round(p.progress || 0) }); },
   });
-  self.postMessage({ type: "ready", device: webgpu ? "webgpu" : "wasm" });
+  self.postMessage({ type: "ready", device: "wasm" });
 }
 self.onmessage = async (e) => {
   const m = e.data;

@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/form";
 import { createVad, rmsOf } from "@/lib/voice/vad";
 import { useSpeechRecognition } from "@/components/interview/use-speech";
 import { loadKokoro, synthKokoro } from "./kokoro";
+import { loadLocalWhisper, transcribeLocal } from "./whisper-local";
 import { LevelMeter } from "./voice-ui";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ export function MicCheck({ sttServer }: { sttServer: boolean }) {
   const [kokoro, setKokoro] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [kokoroPct, setKokoroPct] = useState(0);
   const [ttsMs, setTtsMs] = useState<{ browser?: number; kokoro?: number }>({});
+  const [local, setLocal] = useState<{ state: "idle" | "loading" | "recording" | "transcribing" | "done" | "error"; pct: number; text: string; ms?: number }>({ state: "idle", pct: 0, text: "" });
   const m = useRef<{ stream: MediaStream; ctx: AudioContext; timer: number } | null>(null);
   const sr = useSpeechRecognition(useCallback((t: string) => setHeard((h) => (h ? h + " " : "") + t), []));
 
@@ -78,6 +80,26 @@ export function MicCheck({ sttServer }: { sttServer: boolean }) {
     rec.onstop = () => { if (recUrl) URL.revokeObjectURL(recUrl); setRecUrl(URL.createObjectURL(new Blob(chunks, { type: rec.mimeType }))); setRecState("done"); };
     rec.start(); setRecState("recording");
     window.setTimeout(() => rec.state === "recording" && rec.stop(), 5000);
+  };
+
+  /** Record 4 s from the open mic and transcribe it with Whisper on this device. */
+  const testLocal = async () => {
+    if (!m.current || typeof MediaRecorder === "undefined") return;
+    try {
+      setLocal({ state: "loading", pct: 0, text: "" });
+      await loadLocalWhisper((pct) => setLocal((x) => ({ ...x, pct })));
+      setLocal((x) => ({ ...x, state: "recording" }));
+      const rec = new MediaRecorder(m.current.stream);
+      const chunks: Blob[] = [];
+      rec.ondataavailable = (e) => chunks.push(e.data);
+      const stopped = new Promise<void>((r) => { rec.onstop = () => r(); });
+      rec.start(); window.setTimeout(() => rec.state === "recording" && rec.stop(), 4000);
+      await stopped;
+      setLocal((x) => ({ ...x, state: "transcribing" }));
+      const t0 = performance.now();
+      const text = await transcribeLocal(new Blob(chunks, { type: rec.mimeType }));
+      setLocal({ state: "done", pct: 100, text: text || "(nothing recognised)", ms: Math.round(performance.now() - t0) });
+    } catch { setLocal({ state: "error", pct: 0, text: "" }); }
   };
 
   const sayBrowser = () => {
@@ -149,7 +171,16 @@ export function MicCheck({ sttServer }: { sttServer: boolean }) {
             {sr.error && <p className="text-sm text-warning">{sr.error}</p>}
           </>
         ) : <p className="text-sm text-warning">This browser has no built-in speech recognition. Use Chrome, Edge or Safari, or type your answers.</p>}
-        <p className="text-xs text-muted">{sttServer ? "Whisper (server) is also available in the room's voice settings." : "Server speech-to-text (Whisper) isn't configured on this deployment, so the browser's recognition is used."}</p>
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-sm"><span className="font-medium">Whisper on this device</span> <span className="text-muted">— free and private; works in every modern browser, including Firefox.</span></p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button size="sm" variant="secondary" onClick={() => void testLocal()} disabled={!on || ["loading", "recording", "transcribing"].includes(local.state)}>
+              {["loading", "recording", "transcribing"].includes(local.state) ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Mic className="size-4" aria-hidden />}Test on-device recognition (4 s)
+            </Button>
+            <span className="text-sm" role="status">{!on ? <span className="text-muted">Start the mic test first.</span> : local.state === "loading" ? `Downloading the model… ${local.pct}%` : local.state === "recording" ? "Speak now…" : local.state === "transcribing" ? "Transcribing on your device…" : local.state === "done" ? <>{local.text} <span className="font-mono text-xs text-muted">({local.ms} ms)</span></> : local.state === "error" ? <span className="text-warning">Couldn&apos;t load or run it (offline or blocked).</span> : null}</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted">{sttServer ? "Whisper on the server is also available in the room's voice settings." : "Server Whisper isn't configured here (it needs a free Groq key) — on-device Whisper needs no key."}</p>
       </Card>
 
       <Card className="space-y-3">

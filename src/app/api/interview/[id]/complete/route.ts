@@ -137,7 +137,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       }
       if (plan) {
         const today = new Date();
-        await supabase.from("study_tasks").insert(report.priorities.map((p, i) => ({
+        await admin.from("study_tasks").insert(report.priorities.map((p, i) => ({
+          source: "report",
           plan_id: plan!.id, user_id: user.id, kind: p.kind,
           due_date: localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)),
           title: `${p.topic}: ${p.action}`.slice(0, 300),

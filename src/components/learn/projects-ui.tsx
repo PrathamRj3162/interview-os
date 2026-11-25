@@ -3,7 +3,8 @@
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ScanSearch, Trash2 } from "lucide-react";
-import { addProject, analyseProject, deleteProject } from "@/app/actions/projects";
+import { addProject, analyseProject, analyseProjectWithSnapshot, deleteProject } from "@/app/actions/projects";
+import { snapshotRepo } from "@/lib/projects/github";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/form";
 
@@ -20,14 +21,24 @@ export function AddProjectForm() {
   );
 }
 
-export function AnalyseButton({ id, hasRepo }: { id: string; hasRepo: boolean }) {
+export function AnalyseButton({ id, hasRepo, repoUrl }: { id: string; hasRepo: boolean; repoUrl?: string | null }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
   if (!hasRepo) return <span className="text-xs text-muted">Add a GitHub URL to analyse the code.</span>;
   return (
     <span className="flex flex-wrap items-center gap-2">
-      <Button size="sm" variant="secondary" disabled={pending} onClick={() => start(async () => { const r = await analyseProject(id); setMsg(r.message); if (r.ok) router.refresh(); })}>
+      <Button size="sm" variant="secondary" disabled={pending} onClick={() => start(async () => {
+        let r = await analyseProject(id);
+        setMsg(r.message);
+        if (r.rateLimited && repoUrl) {
+          // The server's free GitHub quota is used up: read the public repo from this browser (its own quota).
+          try { r = await analyseProjectWithSnapshot(id, await snapshotRepo(repoUrl)); }
+          catch (e) { r = { ok: false, message: e instanceof Error ? e.message : "Couldn't read the repository from your browser." }; }
+          setMsg(r.message);
+        }
+        if (r.ok) router.refresh();
+      })}>
         <ScanSearch className="size-4" aria-hidden />{pending ? "Reading the repo…" : "Analyse repository"}
       </Button>
       {msg && <span role="status" className="text-xs text-muted">{msg}</span>}
