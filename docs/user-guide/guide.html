@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Interview OS — User Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  :root { --ink:#14121c; --muted:#5d5a6e; --accent:#6d4ed6; --yellow:#f5c400; --line:#e4e2ec; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.55; margin: 0; }
+  h1 { font-size: 28pt; margin: 0 0 6pt; letter-spacing: -0.5pt; }
+  h2 { font-size: 15pt; margin: 22pt 0 6pt; padding-bottom: 4pt; border-bottom: 2px solid var(--line); page-break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 14pt 0 4pt; page-break-after: avoid; }
+  p { margin: 4pt 0 8pt; }
+  ul, ol { margin: 4pt 0 8pt; padding-left: 16pt; }
+  li { margin: 2pt 0; }
+  .cover { height: 250mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .chip { display:inline-block; background: var(--yellow); color:#14110a; font-weight:700; padding: 3pt 8pt; border-radius: 4pt; box-shadow: 2pt 2pt 0 #a88400; font-size: 9pt; margin-bottom: 14pt; }
+  .lead { font-size: 13pt; color: var(--muted); max-width: 140mm; }
+  .meta { margin-top: 24pt; color: var(--muted); font-size: 9.5pt; }
+  .shot { width: 100%; border: 1px solid var(--line); border-radius: 6pt; margin: 6pt 0 4pt; }
+  .cap { font-size: 8.5pt; color: var(--muted); margin-bottom: 10pt; }
+  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9.5pt; }
+  th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 4pt 6pt; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; }
+  .tip { background: #f4f1ff; border-left: 3px solid var(--accent); padding: 6pt 10pt; margin: 8pt 0; font-size: 9.5pt; }
+  .warn { background: #fff7e0; border-left: 3px solid var(--yellow); padding: 6pt 10pt; margin: 8pt 0; font-size: 9.5pt; }
+  kbd { font-family: ui-monospace, Menlo, monospace; font-size: 8.5pt; border: 1px solid #c9c6d6; border-bottom-width: 2px; border-radius: 3pt; padding: 0 4pt; background: #faf9fd; }
+  .break { page-break-before: always; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <span class="chip">FREE · NO CARD · NO SUBSCRIPTION</span>
+  <h1>Interview OS<br>User Guide</h1>
+  <p class="lead">What's on the website, and how to use every part of it to prepare for software-engineering (SDE) interviews.</p>
+  <p class="meta">Website: https://interview-os-psi.vercel.app<br>Source code: https://github.com/PrathamRj3162/interview-os<br>Guide version: November 2026</p>
+</section>
+
+<h2>1. What Interview OS is</h2>
+<p>Interview OS is a free interview-preparation platform for SDE roles. It reads your resume, works out what an interviewer is likely to ask about it, runs realistic mock interviews (spoken or typed), and gives you a report that shows exactly what to fix next. That report then becomes your to-do list on the dashboard.</p>
+<p><b>The core loop:</b> upload your resume → see the claims you'll be grilled on → take a mock interview → read the evidence-based report → work through today's tasks → retake the round and watch your score trend.</p>
+<div class="tip"><b>Free means free.</b> There are no paid plans or credits. AI features run on free AI-provider tiers with a fair daily limit (60 AI requests per person per day by default). Everything that doesn't need AI (resume scoring, saved reports, your dashboard) is unlimited.</div>
+
+<h2>2. Getting started</h2>
+<h3>Create an account</h3>
+<ol>
+  <li>Open the website and press <b>Let's cook</b> (or <b>Start preparing</b> in Professional mode).</li>
+  <li>Enter your name, email and a password of at least 8 characters, then press <b>Create account</b>.</li>
+  <li>You're signed in straight away and taken to onboarding.</li>
+</ol>
+<h3>Onboarding: your preparation profile</h3>
+<p>This takes about a minute and personalises everything else:</p>
+<table>
+  <tr><th>Field</th><th>Why it matters</th></tr>
+  <tr><td>Experience level</td><td>Pitches questions and explanations at your level.</td></tr>
+  <tr><td>Target role and company type</td><td>Chooses which keywords your resume is checked against and how interviews are framed.</td></tr>
+  <tr><td>Target companies</td><td>Used for company-<i>style</i> practice. Questions are never presented as actually asked at that company.</td></tr>
+  <tr><td>Hours per day and deadline</td><td>Paces your tasks; the dashboard counts down to your deadline.</td></tr>
+  <tr><td>Language, DSA and system-design self-ratings</td><td>A starting estimate only, replaced by measured performance as you practise.</td></tr>
+</table>
+<p>You can change any of this later in <b>Settings</b>.</p>
+
+<h2 class="break">3. The dashboard</h2>
+<img class="shot" src="../redesign/after/dashboard.png" alt="Dashboard">
+<p class="cap">The dashboard after onboarding.</p>
+<ul>
+  <li><b>Top tiles:</b> deadline countdown, daily study time, target companies, and how many AI requests you've used today.</li>
+  <li><b>Today's tasks:</b> concrete actions generated from your interview reports, each saying <i>why</i> it was added. Tick the circle to mark one done.</li>
+  <li><b>Recommended next step:</b> a single suggestion based on where you are (upload a resume → analyse its claims → take a mock → work through tasks).</li>
+  <li><b>Readiness:</b> computed only from your own attempts. Each one stays empty until you have real data — nothing is made up.</li>
+  <li><b>Resume and recent interviews:</b> quick links back to your latest work.</li>
+  <li><b>AI status:</b> which free AI models are active, in fallback order.</li>
+</ul>
+
+<h2>4. Resume intelligence</h2>
+<h3>Upload</h3>
+<ol>
+  <li>Go to <b>Resume intelligence</b> in the sidebar.</li>
+  <li>Choose a <b>PDF or DOCX</b> (up to 5 MB, text-based, not a scanned image) and press <b>Upload and analyse</b>.</li>
+</ol>
+<p>Your file is stored privately. Only you can access it, and the download link expires after 60 seconds.</p>
+<img class="shot" src="../redesign/after/resume-report.png" alt="Resume report">
+<p class="cap">The rule-based report: every point of the score is explained.</p>
+<h3>Readability and quality score (out of 100)</h3>
+<p>Nine transparent checks, each showing points earned, why, and how to improve: standard sections, contact details, length, bullet structure, action verbs, quantified impact, weak phrasing, role keywords, and whether listed skills are backed by projects or experience.</p>
+<div class="warn">This is a practice heuristic. It does not predict any company's applicant-tracking system, and you should only add keywords you can genuinely discuss.</div>
+<h3>AI claim analysis (optional, needs consent)</h3>
+<p>Press <b>Generate interview questions with AI</b> and confirm that your resume text may be sent to the AI provider. You get:</p>
+<ul>
+  <li><b>Claims with risk levels:</b> each line an interviewer is likely to probe, quoted word for word from your resume, with 5–12 progressively deeper questions. Claims the AI can't match to your resume text are discarded automatically.</li>
+  <li><b>Stronger bullet points:</b> rewrites that keep your facts. Where a number would help, a placeholder like <i>[X%]</i> appears — fill it only with a number you can defend.</li>
+  <li><b>Recruiter concerns</b> and <b>standard questions tailored to you</b> ("Tell me about yourself", "Walk me through your resume", and so on).</li>
+  <li><b>Extracted projects</b>, which the mock interviewer can then cross-question.</li>
+</ul>
+<p>Press <b>Practise these in a mock interview</b> to go straight into a resume-based round.</p>
+
+<h2 class="break">5. Mock interviews</h2>
+<h3>Set up a round (3 quick steps)</h3>
+<img class="shot" src="../redesign/after/interview-setup.png" alt="Interview setup">
+<ol>
+  <li><b>Round:</b> resume-based, project deep dive, DSA and live coding, CS fundamentals, low-level design, high-level system design, behavioral, HR, a complete SDE mock, or company-style.</li>
+  <li><b>Interviewer:</b> nine styles that genuinely change how questions are asked — Friendly Mentor, Professional, Strict Senior Engineer, Skeptical Project Evaluator, DSA Specialist, System Design Architect, HR, Behavioral, and Bar Raiser. Also choose difficulty (Beginner → Expert) and mode:
+    <ul><li><b>Mock</b>: realistic. No hints, and answers are never revealed.</li><li><b>Practice</b>: a <b>Hint</b> button is available, and the interviewer may point out misconceptions.</li></ul></li>
+  <li><b>Details:</b> duration, voice or typing, which resume to use, programming language and company style. Check the summary, then press <b>Start interview</b>.</li>
+</ol>
+<h3>In the interview room</h3>
+<ul>
+  <li>The interviewer asks one question at a time and follows up on what you actually said: it challenges vague answers, asks for specifics, and never repeats a question you've already answered.</li>
+  <li><b>Voice mode:</b> questions are read aloud and you answer by speaking; your words appear in the answer box, where you can edit them before sending. It is turn-based browser speech, not a real-time voice model. Works best in Chrome, Edge or Safari. No audio is ever stored — only the text.</li>
+  <li><b>Editor:</b> for coding and design rounds, write code in the editor panel; it is sent along with your next answer.</li>
+  <li><b>Controls:</b> mic on/off, interviewer voice on/off, auto-listen, editor, hint (practice only), pause, focus mode and end.</li>
+</ul>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td><kbd>Space</kbd> (hold)</td><td>Push-to-talk, when you're not typing in a box</td></tr>
+  <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Enter</kbd></td><td>Send your answer</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Pause or resume</td></tr>
+  <tr><td><kbd>?</kbd></td><td>Show the shortcut sheet</td></tr>
+</table>
+<div class="tip">If the AI provider is busy, your answer is still saved. Press <b>Retry</b> and the interviewer picks up where it left off. Reloading the page never restarts the interview.</div>
+
+<h2 class="break">6. Your interview report</h2>
+<p>Press <b>End</b>, then <b>Yes, end</b>. The report is ready in about 20–60 seconds and is saved permanently under <b>Mock interviews</b>.</p>
+<ul>
+  <li><b>Overall score (0–100):</b> the average of the scored rubric categories. If you've done the same round before, you'll see your change since last time.</li>
+  <li><b>Rubric:</b> each category is scored 1–5 with <i>exact quotes</i> from your answers as evidence. Quotes that can't be found in your transcript are discarded, and a category with no real evidence stays unscored rather than guessed.</li>
+  <li><b>Strengths, weaknesses and important mistakes.</b></li>
+  <li><b>Communication:</b> answer count, average length, and filler words per 100 words, counted directly from your transcript. Accent and voice are never assessed.</li>
+  <li><b>Next priorities:</b> automatically added to your dashboard as dated tasks.</li>
+  <li><b>Question-by-question feedback:</b> your actual answer, what was correct, incomplete, wrong or missing, what a strong answer covers, a better structure, topics to study, and likely follow-ups.</li>
+</ul>
+<div class="warn">Scores are practice feedback with a published method. They are not a hiring decision or a prediction of selection.</div>
+
+<h2>7. Settings and privacy</h2>
+<ul>
+  <li><b>Appearance:</b> choose the <b>Neon</b> or <b>High contrast</b> theme, and the <b>Vibe</b>: Gen-Z (casual wording in menus and empty states) or Professional. Reports always stay professional.</li>
+  <li><b>Preparation profile:</b> edit anything from onboarding.</li>
+  <li><b>AI resume consent:</b> turn sending your resume text to the AI provider on or off.</li>
+  <li><b>Delete account:</b> type DELETE to permanently remove your account, resumes and files, interviews and tasks.</li>
+</ul>
+
+<h2>8. Coming next</h2>
+<p>These are planned and shown under "Coming soon" in the sidebar: a DSA live-coding round with real code execution (C++, Java, Python, JavaScript) and hidden tests, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, progress charts, tiers and achievements, and a more natural voice mode.</p>
+
+<h2>9. Tips for getting the most out of it</h2>
+<ol>
+  <li>Upload your <b>real</b> resume first. Everything gets sharper with it.</li>
+  <li>Start in <b>Practice</b> mode at a comfortable difficulty, then switch to <b>Mock</b>.</li>
+  <li>Think aloud. The rubric rewards your reasoning, not just the final answer.</li>
+  <li>After each report, do the top task, then retake the same round to see your trend.</li>
+  <li>Use voice mode at least once a week. Speaking an answer is a different skill from typing it.</li>
+</ol>
+<h3>Troubleshooting</h3>
+<table>
+  <tr><th>Problem</th><th>What to do</th></tr>
+  <tr><td>"Mic blocked"</td><td>Allow microphone access in your browser's site settings, or switch to typing.</td></tr>
+  <tr><td>"No AI provider is currently available"</td><td>Free AI tiers are occasionally busy. Wait a minute and press Retry. Your progress is saved.</td></tr>
+  <tr><td>"Daily AI limit reached"</td><td>The free quota resets within 24 hours; non-AI features keep working.</td></tr>
+  <tr><td>Resume upload rejected</td><td>Use a text-based PDF or DOCX under 5 MB (not a scanned image or photo).</td></tr>
+</table>
+</body>
+</html>

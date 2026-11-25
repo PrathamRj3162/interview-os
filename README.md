@@ -2,7 +2,7 @@
 
 A free, resume-aware SDE interview-prep platform. Upload your resume, see which claims an interviewer will grill you on, then take adaptive mock interviews (voice or text). Each interview ends with an evidence-based report, and the weaknesses it finds feed back into your daily tasks.
 
-**Live:** https://interview-os-psi.vercel.app
+**Live:** https://interview-os-psi.vercel.app · **User guide (PDF):** [docs/Interview-OS-User-Guide.pdf](docs/Interview-OS-User-Guide.pdf) · **Design system:** [/design](https://interview-os-psi.vercel.app/design)
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -21,6 +21,7 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | Voice mode (browser speech recognition + speech synthesis, turn-based, barge-in, text fallback) | ✅ |
 | **Reports**: rubric per round, evidence quotes checked against your transcript, deterministic overall score, per-question feedback, filler-word stats | ✅ |
 | Dashboard: today's tasks from report priorities, data-driven next step | ✅ |
+| Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
 | DSA live-coding round with code execution, CS fundamentals, system design lab, analytics | 🚧 planned |
 
 ## Tech stack
@@ -29,7 +30,7 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 - **Supabase**: Postgres with Row Level Security on every table, Auth, private Storage
 - **AI**: provider-agnostic adapter over OpenAI-compatible APIs. Fallback chain: Gemini (free tier) → Groq → OpenRouter `:free` models → Ollama. It never routes to a paid model.
 - **zod** validation on every action/route and on every AI response
-- **Vitest** unit tests, **Playwright** end-to-end tests, GitHub Actions CI, gitleaks secret scan
+- **Vitest** unit tests, **Playwright** end-to-end tests on a deterministic mock AI (no quota used), GitHub Actions CI, gitleaks secret scan
 - Hosted on **Vercel** (Hobby)
 
 ## Repository layout
@@ -68,7 +69,7 @@ npm run dev                       # http://localhost:3000
 | `npm run dev` / `build` / `start` | Next.js |
 | `npm test` | Vitest unit tests |
 | `npm run typecheck` / `lint` | `tsc --noEmit` / ESLint |
-| `npm run test:e2e` | Playwright against a local production build (uses your `.env.local` Supabase + AI) |
+| `npm run test:e2e` | Playwright against a local production build with mock AI (`AI_MOCK=1`); uses your `.env.local` Supabase |
 
 Deployment details: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 

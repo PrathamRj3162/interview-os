@@ -53,7 +53,9 @@ export function HeroSkyline() {
       </div>
       <div className="scanlines absolute inset-0 opacity-60" />
       {/* dark overlay keeps text AA-readable */}
-      <div className="absolute inset-0 bg-gradient-to-b from-bg/70 via-bg/55 to-bg" />
+      <div className="absolute inset-0 bg-gradient-to-b from-bg/60 via-bg/30 to-bg" />
+      {/* soft vignette behind the headline for contrast */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_45%_at_50%_45%,rgb(11_10_18/0.55),transparent)]" />
     </div>
   );
 }

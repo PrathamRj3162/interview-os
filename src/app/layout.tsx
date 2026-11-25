@@ -20,8 +20,9 @@ export const viewport: Viewport = { themeColor: "#0b0a12", colorScheme: "dark" }
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const { theme } = await getPrefs();
   return (
-    <html lang="en" data-theme={theme}>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable} min-h-dvh antialiased`}>
+    // Font variables live on <html> so theme tokens (--font-sans/--font-display, defined on :root) can resolve them.
+    <html lang="en" data-theme={theme} className={`${geistSans.variable} ${geistMono.variable} ${pixel.variable}`}>
+      <body className="min-h-dvh antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

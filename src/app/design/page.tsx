@@ -45,7 +45,7 @@ export default function DesignPage() {
 
       <section aria-labelledby="type" className="space-y-3">
         <h2 id="type" className="text-lg font-semibold">Typography</h2>
-        <p className="font-[family-name:var(--font-display)] text-5xl font-bold">Pixelify — display</p>
+        <p className="font-display text-5xl font-bold">Pixelify — display</p>
         <p className="text-xs text-muted">Display font only for the logo and the landing H1.</p>
         {["text-3xl", "text-2xl", "text-xl", "text-lg", "text-base", "text-sm", "text-xs"].map((c) => <p key={c} className={c}>Geist {c.replace("text-", "")} — The quick brown fox</p>)}
         <p className="font-mono text-sm">Geist Mono — const answer = 42;</p>

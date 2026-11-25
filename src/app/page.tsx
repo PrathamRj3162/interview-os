@@ -46,7 +46,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
           <HeroSkyline />
           <div className="relative mx-auto flex min-h-[min(46rem,92vh)] max-w-6xl flex-col items-center justify-center px-4 py-24 text-center">
             <Badge tone="primary" className="mb-6">Free · no card · no subscription</Badge>
-            <h1 className="max-w-4xl font-[family-name:var(--font-display)] text-4xl font-bold leading-[1.1] tracking-wide sm:text-6xl">
+            <h1 className="max-w-4xl font-display text-4xl font-bold leading-[1.1] tracking-wide sm:text-6xl">
               Practise the interview <span className="text-primary">before</span> the interview.
             </h1>
             <p className="mt-6 max-w-2xl text-lg text-text/85">

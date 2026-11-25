@@ -16,7 +16,7 @@ export default defineConfig({
   ],
   webServer: process.env.E2E_BASE_URL ? undefined : {
     // AI_MOCK=1: deterministic offline AI so E2E never spends free provider quota.
-    command: "npm run build && AI_MOCK=1 npm run start -- -p 3000",
+    command: `npm run build && AI_MOCK=${process.env.E2E_AI_MOCK ?? "1"} npm run start -- -p 3000`,
     url: "http://localhost:3000/api/health",
     reuseExistingServer: true,
     stdout: "pipe", // surface server [ai] timing logs in test output
