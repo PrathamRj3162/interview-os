@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { COMPANY_STYLES } from "@/lib/interview/companies";
 
 export const ROLES = {
   sde1: "SDE-1",
@@ -37,10 +38,8 @@ export const LEARNING_STYLES = {
   mixed: "Mix of both",
 } as const;
 
-export const COMPANIES = [
-  "Google", "Amazon", "Microsoft", "Meta", "Adobe", "Atlassian", "Uber",
-  "Flipkart", "Walmart", "Oracle", "Salesforce",
-] as const;
+/** Target companies (style practice only) — one list, from the company style map. */
+export const COMPANIES = COMPANY_STYLES.map((c) => c.name) as [string, ...string[]];
 
 export const LEVEL_LABELS = ["", "None yet", "Basics", "Comfortable", "Strong", "Expert"] as const;
 

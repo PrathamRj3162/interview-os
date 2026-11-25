@@ -2,9 +2,10 @@ import "server-only";
 import { z } from "zod";
 import { generateObject, type ChatMessage } from "@/lib/ai";
 import { untrusted } from "@/lib/ai/json";
-import { PERSONAS, KINDS, KIND_FOCUS, RUBRICS, DIFFICULTIES, type KindId, type PersonaId, type Difficulty } from "./config";
+import { PERSONAS, KINDS, KIND_FOCUS, RUBRICS, DIFFICULTIES, CHARACTERS, TIERS, type KindId, type PersonaId, type Difficulty } from "./config";
 import { pairTurns, communicationStats, type Turn } from "./analysis";
 import { anchorsFor, isCore, weightOf, type Anchors } from "./rubric";
+import { companyPrompt } from "./companies";
 import { computeVerdict, pickOneThing, type CodingFacts, type Verdict } from "./verdict";
 import { locateQuote, numberLines, validateCodeNotes, type CodeNote, type Metrics } from "./metrics";
 
@@ -59,11 +60,11 @@ function dsaSection(iv: InterviewRow, d: DsaPrompt) {
 function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean, dsa?: DsaPrompt) {
   const persona = PERSONAS[iv.persona] ?? PERSONAS.professional;
   const lines = [
-    `You are "${persona.name}", conducting a ${KINDS[iv.kind].name} for a ${ctx.role ?? "software engineer"} candidate (${ctx.experience ?? "unknown experience"}).`,
+    `You are ${CHARACTERS[iv.persona]?.first ?? "the interviewer"}, a "${persona.name}" (interviewer tier: ${TIERS[CHARACTERS[iv.persona]?.tier ?? "standard"].label}), conducting a ${KINDS[iv.kind].name} for a ${ctx.role ?? "software engineer"} candidate (${ctx.experience ?? "unknown experience"}).`,
     `Personality and strategy: ${persona.style}`,
     `Round focus: ${KIND_FOCUS[iv.kind]}`,
     `Difficulty: ${DIFFICULTIES[iv.difficulty]}. Adapt: go deeper after strong answers; after weak ones, probe the gap once more before moving on.`,
-    iv.company ? `Target company: ${iv.company}. You may emulate its publicly known interview style. Never claim a question was actually asked at that company.` : "",
+    iv.company ? (companyPrompt(iv.company) || `Target company: ${iv.company}. You may emulate its publicly known interview style. Never claim a question was actually asked at that company.`) : "",
     iv.language ? `Candidate's preferred programming language: ${iv.language}.` : "",
     `Time remaining: about ${Math.max(0, Math.round(minutesLeft))} minutes of ${iv.duration_min}.`,
     "",
@@ -255,6 +256,8 @@ export type InterviewReport = {
   provider: string; model: string;
   /** DSA live-coding round: objective facts from the judge and the room (computed in code, not by AI). */
   dsa?: DsaReport;
+  /** Answers that contained pasted text (80+ characters). A flag for the candidate; it doesn't change any score. */
+  integrity?: { pastedAnswers: number; pastedChars: number };
 };
 
 export type DsaReport = {

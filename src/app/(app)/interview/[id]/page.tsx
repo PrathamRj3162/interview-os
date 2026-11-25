@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { InterviewRoom } from "@/components/interview/room";
 import { requireUser } from "@/lib/supabase/server";
 import { loadInterview, loadTurns } from "@/lib/interview/server";
-import { KINDS, PERSONAS } from "@/lib/interview/config";
+import { KINDS, PERSONAS, CHARACTERS } from "@/lib/interview/config";
 import { dsaContextFor, loadEvents, asPhase, initialWorkspace, type Workspace } from "@/lib/dsa/server";
 import { STRESS } from "@/lib/dsa/stress";
 import { sttAvailable } from "@/lib/voice/server";
@@ -28,7 +28,8 @@ export default async function InterviewRoomPage({ params }: { params: Promise<{ 
     <InterviewRoom
       id={id}
       title={dsa ? `DSA round · ${dsa.problem.title}` : KINDS[iv.kind]?.name ?? "Interview"}
-      personaName={PERSONAS[iv.persona]?.name ?? "Interviewer"}
+      personaName={PERSONAS[iv.persona] ? `${CHARACTERS[iv.persona].first} · ${PERSONAS[iv.persona].name}` : "Interviewer"}
+      personaId={iv.persona}
       mode={iv.mode}
       inputMode={iv.input_mode === "voice" ? "voice" : "text"}
       sttServer={sttAvailable()}

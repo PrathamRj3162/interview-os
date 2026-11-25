@@ -92,7 +92,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         browserRuns: events.filter((e) => e.type === "run" && e.payload.runner === "browser").length,
         judgeRuns: events.filter((e) => e.type === "run" && e.payload.runner === "judge0").length,
         hintsUsed: events.filter((e) => e.type === "hint").length,
-        pastes: events.filter((e) => e.type === "paste").map((e) => ({ chars: Number(e.payload.chars) || 0 })),
+        pastes: events.filter((e) => e.type === "paste" && e.payload.where !== "answer").map((e) => ({ chars: Number(e.payload.chars) || 0 })),
         idleMinutes: Math.round(events.filter((e) => e.type === "idle").reduce((a, e) => a + (Number(e.payload.seconds) || 0), 0) / 60),
         phasesReached: [...new Set(phases)].map((p) => PHASE_LABELS[p as Phase] ?? p),
         optimal: dsa.solution.optimal, brute: dsa.solution.brute,
@@ -119,6 +119,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     }
     ctx.facts = facts;
     const report = await evaluateInterview(iv, turns, ctx);
+    // Paste detection in typed answers (any round): flagged for the candidate, never scored.
+    const answerPastes = (await loadEvents(supabase, id)).filter((e) => e.type === "paste" && e.payload.where === "answer");
+    if (answerPastes.length) report.integrity = { pastedAnswers: answerPastes.length, pastedChars: answerPastes.reduce((s, e) => s + (Number(e.payload.chars) || 0), 0) };
     if (dsaReport) report.dsa = dsaReport;
     await recordUsage(supabase, user.id, "interview_report", report.provider, report.model);
     const done = await own()

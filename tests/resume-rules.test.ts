@@ -64,3 +64,32 @@ describe("resume rules", () => {
     expect(findSkills("Built with JavaScript")).not.toContain("Java");
   });
 });
+
+import { checkDates, analyzeResume as analyze2 } from "@/lib/resume/rules";
+describe("date checks", () => {
+  const now = new Date("2026-11-25");
+  it("accepts consistent, ordered ranges with Present", () => {
+    const exp = "SDE Intern, Acme — Jun 2025 – Present\nIntern, Beta — Jan 2024 – Mar 2024";
+    expect(checkDates(exp, exp, now)).toEqual({ ranges: 2, issues: [] });
+  });
+  it("flags mixed formats, reversed ranges, future ends, open ranges and order", () => {
+    const exp = "Beta — 01/2023 – 05/2023\nAcme — Jun 2025 – Present";
+    const text = `${exp}\nB.Tech, XYZ — Aug 2021 – Jul 2027\nHackathon — Mar 2024 – Jan 2024\nClub — Feb 2022 –\n`;
+    const issues = checkDates(text, exp, now).issues.join(" | ");
+    expect(issues).toMatch(/Mixed date formats/);
+    expect(issues).toMatch(/Mar 2024 – Jan 2024" ends before it starts/);
+    expect(issues).toMatch(/Jul 2027" ends in the future/);
+    expect(issues).toMatch(/Feb 2022 –" has no end date/);
+    expect(issues).toMatch(/reverse-chronological/);
+    expect(checkDates("B.Tech — Aug 2023 – Expected May 2027", undefined, now).issues).toEqual([]);
+  });
+  it("bullet length check lists long and short bullets", () => {
+    const long = "Built " + Array.from({ length: 40 }, (_, i) => `thing${i}`).join(" ");
+    const r = analyze2(`Experience\n- ${long}\n- Did it\n- Built a REST API serving 10k users with Redis caching\n- Reduced p95 latency by 40% using batching`, "backend");
+    const c = r.checks.find((x) => x.id === "bullet_length")!;
+    expect(r.stats.longBullets).toHaveLength(1);
+    expect(r.stats.shortBullets).toEqual(["Did it"]);
+    expect(c.earned).toBeLessThan(5);
+    expect(c.detail).toMatch(/1 too long .*1 too short/);
+  });
+});

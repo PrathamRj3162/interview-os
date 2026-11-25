@@ -5,7 +5,7 @@ import { AIUnavailableError } from "@/lib/ai";
 import { assertQuota, recordUsage, QuotaExceededError } from "@/lib/ai/quota";
 import { nextInterviewerTurn, practiceHint, type DsaPrompt } from "@/lib/interview/engine";
 import { loadInterview, loadTurns, loadCandidateContext, minutesLeft } from "@/lib/interview/server";
-import { PERSONAS } from "@/lib/interview/config";
+import { PERSONAS, CHARACTERS, type PersonaId } from "@/lib/interview/config";
 import { PHASES, PHASE_GOALS, PHASE_LABELS, nextPhase, codeLinesBeyondStarter, lineDiff } from "@/lib/dsa/phases";
 import { dsaContextFor, loadEvents, logEvent, saveWorkspace, describeEvents, asPhase, isLang, initialWorkspace, type Workspace } from "@/lib/dsa/server";
 import { starterCode } from "@/lib/dsa/harness";
@@ -18,6 +18,8 @@ const bodySchema = z.discriminatedUnion("action", [
     content: z.string().trim().min(1).max(6000),
     code: z.string().max(50000).nullish(),
     language: z.enum(["python", "javascript", "cpp", "java"]).nullish(),
+    /** Characters pasted into the answer box for this answer (paste detection, flagged in the report). */
+    pasted: z.number().int().min(0).max(100000).optional(),
   }),
   z.object({ action: z.literal("hint") }),
 ]);
@@ -53,7 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // DSA opening and hints are deterministic: no AI call, no quota, and the hints are written in advance.
   if (dsa && body.action === "start") {
     const name = (await loadCandidateContext(supabase, user.id, null)).name?.split(" ")[0];
-    const opening = `Hi${name ? ` ${name}` : ""}, I'm your ${PERSONAS[iv.persona]?.name ?? "interviewer"} today. We'll work through one problem: "${dsa.problem.title}". It's on your screen now. Take a minute to read it, then tell me in your own words what it's asking, and ask anything you'd like clarified. Please think out loud as you go — you can run your code against the examples whenever you like.`;
+    const opening = `Hi${name ? ` ${name}` : ""}, I'm ${CHARACTERS[iv.persona as PersonaId]?.first ?? "your interviewer"}${PERSONAS[iv.persona] ? `, your ${PERSONAS[iv.persona].name}` : ""} today. We'll work through one problem: "${dsa.problem.title}". It's on your screen now. Take a minute to read it, then tell me in your own words what it's asking, and ask anything you'd like clarified. Please think out loud as you go — you can run your code against the examples whenever you like.`;
     const ins = await say(opening);
     if (ins.error) return NextResponse.json({ error: "Could not start the interview." }, { status: 500 });
     return NextResponse.json({ turns: [ins.data], phase: "intro" });
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const ins = await supabase.from("interview_turns")
         .insert({ interview_id: id, user_id: user.id, role: "candidate", content: body.content, code: body.code ?? null })
         .select(TURN_COLS).single();
+      if (body.pasted && body.pasted >= 80) await logEvent(supabase, id, user.id, "paste", { chars: body.pasted, where: "answer", answerChars: body.content.length });
       if (ins.error) return NextResponse.json({ error: "Could not save your answer." }, { status: 500 });
       turns = [...turns, ins.data];
     }

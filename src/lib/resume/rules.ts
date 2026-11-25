@@ -26,6 +26,9 @@ export type RuleReport = {
     skillsFound: string[];
     unsupportedSkills: string[];
     missingKeywords: string[];
+    longBullets: string[];
+    shortBullets: string[];
+    dateIssues: string[];
   };
 };
 
@@ -116,6 +119,65 @@ export function getBullets(text: string): string[] {
 
 const clamp = (n: number, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, n));
 
+// ───────────── Dates ─────────────
+
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTH_RE = "(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)";
+const DATE_RE = `(?:${MONTH_RE}\\.?,?\\s+(?:19|20)\\d{2}|(?:0?[1-9]|1[0-2])\\/(?:19|20)\\d{2}|(?:19|20)\\d{2}-(?:0[1-9]|1[0-2])|(?:19|20)\\d{2})`;
+const RANGE_RE = new RegExp(`(${DATE_RE})\\s*(?:–|—|-|to|until)\\s*(${DATE_RE}|present|current|now|ongoing|till date|expected\\s+${DATE_RE})?`, "gi");
+
+type DateStyle = "Mon YYYY" | "Month YYYY" | "MM/YYYY" | "YYYY-MM" | "YYYY";
+function parseDate(raw: string): { ym: number; style: DateStyle } | null {
+  const t = raw.trim().toLowerCase().replace(/^expected\s+/, "");
+  let m: RegExpMatchArray | null;
+  if ((m = t.match(new RegExp(`^(${MONTH_RE})\\.?,?\\s+(\\d{4})$`)))) {
+    const mon = MONTHS.indexOf(m[1].slice(0, 3));
+    return { ym: Number(m[2]) * 12 + mon, style: m[1].length <= 4 ? "Mon YYYY" : "Month YYYY" };
+  }
+  if ((m = t.match(/^(\d{1,2})\/(\d{4})$/))) return { ym: Number(m[2]) * 12 + Number(m[1]) - 1, style: "MM/YYYY" };
+  if ((m = t.match(/^(\d{4})-(\d{2})$/))) return { ym: Number(m[1]) * 12 + Number(m[2]) - 1, style: "YYYY-MM" };
+  if ((m = t.match(/^(\d{4})$/))) return { ym: Number(m[1]) * 12, style: "YYYY" };
+  return null;
+}
+
+/**
+ * Date checks over "start – end" ranges: one consistent format, end not before start, no end date in the
+ * future (unless marked Expected/Present), no open-ended ranges, and Experience listed newest first.
+ */
+export function checkDates(text: string, experienceText: string | undefined, now = new Date()): { ranges: number; issues: string[] } {
+  const nowYm = now.getFullYear() * 12 + now.getMonth();
+  const issues: string[] = [];
+  const styles = new Set<DateStyle>();
+  let ranges = 0;
+  const fmt = (r: string) => r.replace(/\s+/g, " ").trim();
+  for (const m of text.matchAll(RANGE_RE)) {
+    const a = parseDate(m[1]);
+    if (!a) continue;
+    const endRaw = m[2]?.trim();
+    // Bare years are only a date range when both sides are years (avoid "2023 - present" false matches being fine anyway).
+    ranges++;
+    styles.add(a.style);
+    if (!endRaw) { if (a.style !== "YYYY") issues.push(`"${fmt(m[0])}" has no end date — add one, or "Present".`); continue; }
+    if (/^(present|current|now|ongoing|till date)$/i.test(endRaw)) continue;
+    const b = parseDate(endRaw);
+    if (!b) continue;
+    styles.add(b.style);
+    if (b.ym < a.ym) issues.push(`"${fmt(m[0])}" ends before it starts.`);
+    else if (b.ym > nowYm + 1 && !/^expected/i.test(endRaw)) issues.push(`"${fmt(m[0])}" ends in the future — write "Expected ${endRaw}" or "Present".`);
+  }
+  const monthStyles = [...styles].filter((x) => x !== "YYYY");
+  if (monthStyles.length > 1) issues.push(`Mixed date formats (${monthStyles.join(", ")}) — pick one, e.g. "Jan 2024".`);
+  if (experienceText) {
+    const starts = [...experienceText.matchAll(RANGE_RE)].map((m) => parseDate(m[1])?.ym).filter((x): x is number => x != null);
+    for (let i = 1; i < starts.length; i++) if (starts[i] > starts[i - 1]) { issues.push("Experience isn't in reverse-chronological order — list the most recent role first."); break; }
+  }
+  return { ranges, issues: [...new Set(issues)].slice(0, 8) };
+}
+
+/** Bullets are easiest to scan at 8–30 words (one or two lines). */
+export const BULLET_MIN_WORDS = 5;
+export const BULLET_MAX_WORDS = 30;
+
 export function analyzeResume(text: string, targetRole: string | null): RuleReport {
   const lower = text.toLowerCase();
   const words = text.split(/\s+/).filter(Boolean).length;
@@ -166,6 +228,11 @@ export function analyzeResume(text: string, targetRole: string | null): RuleRepo
   });
 
   const nb = Math.max(bullets.length, 1);
+  const wc = (b: string) => b.split(/\s+/).filter(Boolean).length;
+  const longBullets = bullets.filter((b) => wc(b) > BULLET_MAX_WORDS);
+  const shortBullets = bullets.filter((b) => wc(b) < BULLET_MIN_WORDS);
+  const dates = checkDates(text, sectionsText.experience);
+  const clip = (b: string) => (b.length > 70 ? b.slice(0, 70) + "…" : b);
   const checks: Check[] = [
     {
       id: "sections", label: "Standard sections", weight: 15,
@@ -216,6 +283,20 @@ export function analyzeResume(text: string, targetRole: string | null): RuleRepo
       tip: "Only add keywords you genuinely have experience with — interviewers will ask about them.",
     },
     {
+      id: "bullet_length", label: "Bullet length", weight: 5,
+      earned: bullets.length ? Math.round(5 * clamp((bullets.length - longBullets.length - shortBullets.length) / bullets.length / 0.85)) : 0,
+      detail: !bullets.length ? "No bullets found." : longBullets.length + shortBullets.length === 0
+        ? `All ${bullets.length} bullets are ${BULLET_MIN_WORDS}–${BULLET_MAX_WORDS} words.`
+        : [longBullets.length ? `${longBullets.length} too long (over ${BULLET_MAX_WORDS} words), e.g. "${clip(longBullets[0])}"` : "", shortBullets.length ? `${shortBullets.length} too short (under ${BULLET_MIN_WORDS} words), e.g. "${clip(shortBullets[0])}"` : ""].filter(Boolean).join("; ") + ".",
+      tip: "Keep each bullet to one or two lines: action, what you built, and the result.",
+    },
+    {
+      id: "dates", label: "Dates", weight: 5,
+      earned: dates.ranges === 0 ? 1 : Math.max(0, 5 - 2 * dates.issues.length),
+      detail: dates.ranges === 0 ? "No date ranges found for your experience or education." : dates.issues.length ? dates.issues.join(" ") : `${dates.ranges} date range${dates.ranges === 1 ? "" : "s"}, consistent and in order.`,
+      tip: "Use one format (e.g. \"Jan 2024 – Present\"), newest role first, and mark future dates as Expected.",
+    },
+    {
       id: "evidence", label: "Skills backed by evidence", weight: 5,
       earned: unsupportedSkills.length === 0 ? 5 : unsupportedSkills.length <= 2 ? 3 : 1,
       detail: unsupportedSkills.length ? `Listed in Skills but not used in any project/experience: ${unsupportedSkills.join(", ")}.` : "Every listed skill appears in a project or experience entry (or no separate Skills section found).",
@@ -231,6 +312,7 @@ export function analyzeResume(text: string, targetRole: string | null): RuleRepo
     stats: {
       words, bullets: bullets.length, quantifiedBullets: quantified.length, actionVerbBullets: actionStart.length,
       weakPhrases: weakClean, sections, contact, skillsFound, unsupportedSkills, missingKeywords,
+      longBullets: longBullets.map(clip), shortBullets: shortBullets.map(clip), dateIssues: dates.issues,
     },
   };
 }

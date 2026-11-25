@@ -159,3 +159,22 @@ describe("report view", () => {
     expect(v.categories[0].evidence).toEqual([{ text: "quote here please", at: null }]);
   });
 });
+
+import { suggestDifficulty, harder } from "@/lib/interview/suggest";
+describe("suggested difficulty", () => {
+  const h = (difficulty: string, verdict: string | null, endedAt: string, kind = "dsa") => ({ kind, difficulty, verdict, endedAt });
+  it("moves up after Hire, down after No Hire, stays after Lean Hire", () => {
+    expect(suggestDifficulty([], "dsa").difficulty).toBe("medium");
+    expect(suggestDifficulty([h("medium", "hire", "2026-11-02"), h("easy", "no_hire", "2026-11-01")], "dsa")).toMatchObject({ difficulty: "hard" });
+    expect(suggestDifficulty([h("hard", "no_hire", "2026-11-02")], "dsa").difficulty).toBe("medium");
+    expect(suggestDifficulty([h("hard", "lean_hire", "2026-11-02")], "dsa").difficulty).toBe("hard");
+    expect(suggestDifficulty([h("expert", "strong_hire", "2026-11-02")], "dsa").difficulty).toBe("expert");
+    expect(suggestDifficulty([h("beginner", "no_hire", "2026-11-02")], "dsa").difficulty).toBe("beginner");
+  });
+  it("two Lean No in a row at the same level steps down; other rounds are ignored", () => {
+    expect(suggestDifficulty([h("medium", "lean_no", "2026-11-03"), h("medium", "lean_no", "2026-11-02")], "dsa").difficulty).toBe("easy");
+    expect(suggestDifficulty([h("medium", "lean_no", "2026-11-03"), h("medium", "hire", "2026-11-02")], "dsa").difficulty).toBe("medium");
+    expect(suggestDifficulty([h("hard", "hire", "2026-11-03", "hr")], "dsa").difficulty).toBe("medium");
+    expect(harder("hard")).toBe("expert");
+  });
+});

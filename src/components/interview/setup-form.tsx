@@ -5,7 +5,10 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { createInterview } from "@/app/actions/interview";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Select } from "@/components/ui/form";
-import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS, type KindId, type PersonaId, type Difficulty } from "@/lib/interview/config";
+import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS, CHARACTERS, TIERS, type KindId, type PersonaId, type Difficulty, type TierId } from "@/lib/interview/config";
+import { InterviewerAvatar } from "./avatar";
+
+const TIER_TONE: Record<TierId, string> = { warmup: "bg-success/15 text-success", standard: "bg-info/15 text-info", tough: "bg-warning/15 text-warning", bar_raiser: "bg-primary/15 text-primary" };
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
 import { cn } from "@/lib/utils";
 import { PROBLEMS } from "@/lib/dsa/bank";
@@ -16,15 +19,21 @@ const option = "cursor-pointer rounded-[var(--radius-md)] border px-4 py-3 text-
 const on = "border-accent bg-accent-soft";
 const off = "border-border bg-surface hover:border-border-strong hover:bg-surface-2";
 
-export function SetupForm({ defaults, resumes }: {
-  defaults: { kind: KindId; problem?: string | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
+export function SetupForm({ defaults, resumes, suggestions }: {
+  defaults: { kind: KindId; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
   resumes: { id: string; file_name: string; analysed: boolean }[];
+  /** Suggested difficulty per round, from recent verdicts. */
+  suggestions?: Partial<Record<KindId, { difficulty: Difficulty; reason: string }>>;
 }) {
   const [state, action, pending] = useActionState(createInterview, null);
   const [step, setStep] = useState(0);
   const [kind, setKind] = useState<KindId>(defaults.kind);
-  const [persona, setPersona] = useState<PersonaId>(KINDS[defaults.kind].defaultPersona);
-  const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty ?? "medium");
+  const [persona, setPersona] = useState<PersonaId>(defaults.persona ?? KINDS[defaults.kind].defaultPersona);
+  const [difficulty, setDifficulty] = useState<Difficulty>(defaults.difficulty ?? suggestions?.[defaults.kind]?.difficulty ?? "medium");
+  const [touchedDifficulty, setTouchedDifficulty] = useState(Boolean(defaults.difficulty));
+  const suggestion = suggestions?.[kind];
+  // Follow the suggestion when the round changes, until the candidate picks a difficulty themselves.
+  useEffect(() => { if (!touchedDifficulty && suggestion) setDifficulty(suggestion.difficulty); }, [kind, touchedDifficulty, suggestion]); // eslint-disable-line react-hooks/set-state-in-effect -- derived default
   const [mode, setMode] = useState<"mock" | "practice">("mock");
   const [input, setInput] = useState<"text" | "voice">("voice");
   const [duration, setDuration] = useState("20");
@@ -77,15 +86,20 @@ export function SetupForm({ defaults, resumes }: {
             {(Object.keys(PERSONAS) as PersonaId[]).map((id) => (
               <label key={id} className={cn(option, persona === id ? on : off)}>
                 <input type="radio" name="persona" value={id} checked={persona === id} onChange={() => setPersona(id)} className="sr-only" />
-                <span className="block font-medium">{PERSONAS[id].name}{KINDS[kind].defaultPersona === id && <span className="ml-1.5 text-xs font-normal text-accent">suggested</span>}</span>
-                <span className="mt-0.5 block text-xs text-muted">{PERSONAS[id].blurb}</span>
+                <span className="flex items-start gap-3">
+                  <InterviewerAvatar persona={id} size={40} />
+                  <span className="min-w-0">
+                    <span className="block font-medium">{CHARACTERS[id].first} · {PERSONAS[id].name}{KINDS[kind].defaultPersona === id && <span className="ml-1.5 text-xs font-normal text-accent">suggested</span>}</span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-muted"><span className={cn("rounded px-1.5 py-px font-medium", TIER_TONE[CHARACTERS[id].tier])} title={TIERS[CHARACTERS[id].tier].desc}>{TIERS[CHARACTERS[id].tier].label}</span>{PERSONAS[id].blurb}</span>
+                  </span>
+                </span>
               </label>
             ))}
           </div>
         </fieldset>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Difficulty" htmlFor="difficulty">
-            <Select id="difficulty" name="difficulty" value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
+          <Field label="Difficulty" htmlFor="difficulty" hint={suggestion ? `Suggested: ${suggestion.difficulty}. ${suggestion.reason}` : undefined}>
+            <Select id="difficulty" name="difficulty" value={difficulty} onChange={(e) => { setDifficulty(e.target.value as Difficulty); setTouchedDifficulty(true); }}>
               {Object.entries(DIFFICULTIES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </Select>
           </Field>
@@ -152,7 +166,7 @@ export function SetupForm({ defaults, resumes }: {
           <h2 className="font-medium">Summary</h2>
           <dl className="mt-3 space-y-2 text-sm">
             {[
-              ["Round", KINDS[kind].name], ["Interviewer", PERSONAS[persona].name], ["Difficulty", difficulty], ["Mode", mode === "mock" ? "Mock (no hints)" : "Practice (hints)"],
+              ["Round", KINDS[kind].name], ["Interviewer", `${CHARACTERS[persona].first} · ${PERSONAS[persona].name} (${TIERS[CHARACTERS[persona].tier].label})`], ["Difficulty", difficulty], ["Mode", mode === "mock" ? "Mock (no hints)" : "Practice (hints)"],
               ["Duration", `${duration} min`], ["Answer by", input === "voice" ? "Voice" : "Typing"],
               ["Resume", resumes.find((r) => r.id === resumeId)?.file_name ?? "Not used"], ["Company style", company === "none" ? "General" : company],
               ...(isDsa ? [["Problem", PROBLEMS.find((p) => p.slug === problem)?.title ?? "Random"]] : []),

@@ -94,9 +94,11 @@ test("interview: text mock interview → evidence-based report → tasks on dash
     "The dataset was imbalanced, roughly three pneumonia images for every normal one, so I used a weighted binary cross-entropy loss and also augmentation like rotations and flips. I tracked recall because missing pneumonia is worse than a false alarm.",
     "Honestly I didn't do cross-validation, I just used the provided train and test split. Um, I would improve it with k-fold and by checking calibration.",
   ];
-  for (const a of answers) {
+  for (const [i, a] of answers.entries()) {
     const before = await transcript.locator("li").count();
     await page.getByLabel("Your answer").fill(a);
+    // Paste detection: the first answer arrives via a (synthetic) paste of 80+ characters.
+    if (i === 0) await page.getByLabel("Your answer").evaluate((el, text) => { const dt = new DataTransfer(); dt.setData("text/plain", text); el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, a);
     await page.getByRole("button", { name: "Send" }).click();
     await expect(transcript.locator("li")).toHaveCount(before + 2, { timeout: 60_000 });
     await expect(page.getByText(/Thinking…/)).toHaveCount(0, { timeout: 60_000 });
@@ -127,6 +129,14 @@ test("interview: text mock interview → evidence-based report → tasks on dash
   // Our own answer text is shown verbatim
   await page.getByText("Question 1").first().click();
   await expect(page.getByText(/DenseNet121 with transfer learning because dense connections/).first()).toBeVisible();
+
+  // Paste flag, next steps (with suggested next difficulty) and the emoji rating
+  await expect(page.getByTestId("paste-flag")).toContainText("1 answer included pasted text");
+  await expect(page.getByTestId("next-harder")).toHaveAttribute("href", /difficulty=/);
+  await page.getByRole("radio", { name: "Great" }).click();
+  await expect(page.getByTestId("rating")).toContainText("Thanks — saved.");
+  await page.reload();
+  await expect(page.getByRole("radio", { name: "Great" })).toHaveAttribute("aria-checked", "true");
 
   // Duplicate completion is a no-op
   const id = page.url().split("/interview/")[1].split("/")[0];

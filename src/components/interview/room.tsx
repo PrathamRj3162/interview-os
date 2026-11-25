@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useVoice } from "@/components/voice/use-voice";
+import { InterviewerAvatar } from "./avatar";
 import { VoiceSettingsDialog, LevelMeter } from "@/components/voice/voice-ui";
 import { useDsaWorkspace, type DsaInit, type DsaWorkspace } from "@/components/dsa/use-dsa-workspace";
 import { ProblemPanel, EditorPanel, PhaseStepper, SplitPanes } from "@/components/dsa/panels";
@@ -20,6 +21,7 @@ export type RoomProps = {
   id: string;
   title: string;
   personaName: string;
+  personaId?: string;
   mode: "mock" | "practice";
   inputMode: "text" | "voice";
   coding: boolean;
@@ -78,6 +80,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   });
   const { mic, tts } = voice;
   const [showVoice, setShowVoice] = useState(false);
+  const pastedRef = useRef(0); // characters pasted into the current answer
 
   // Clock
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
@@ -144,10 +147,11 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
     if (ws) {
       ws.touch();
       await ws.flush(true); // the interviewer sees runs/pastes/idle that happened since its last message
-      ok = await post({ action: "answer", content, code: ws.code, language: ws.language });
+      ok = await post({ action: "answer", content, code: ws.code, language: ws.language, ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
     } else {
-      ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null });
+      ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null, ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
     }
+    if (ok) pastedRef.current = 0;
     if (!ok && !turns.some((t) => t.role === "candidate" && t.content === content)) setDraft(content);
   };
 
@@ -221,6 +225,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
 
   const headerEl = (
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
+        {p.personaId && <InterviewerAvatar persona={p.personaId} size={36} className="hidden sm:block" />}
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-semibold">{p.title}</h1>
           <p className="truncate text-xs text-muted">{p.personaName} · {p.mode === "mock" ? "Mock interview (no hints)" : "Practice mode"}</p>
@@ -279,6 +284,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
           id="answer" rows={3} value={draft + (mic.interim ? (draft ? " " : "") + mic.interim : "")}
           onChange={(e) => { if (!mic.interim) setDraft(e.target.value); }}
           onKeyDown={onKey} disabled={paused}
+          onPaste={(e) => { pastedRef.current += e.clipboardData.getData("text").length; }}
           placeholder={mic.state === "listening" ? "Listening… speak your answer. You can edit the text before sending." : "Type your answer (Ctrl/⌘ + Enter to send)"}
           className="w-full resize-none bg-transparent text-sm leading-6 focus:outline-none disabled:opacity-50"
         />

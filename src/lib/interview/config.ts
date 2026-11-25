@@ -49,6 +49,31 @@ export const PERSONAS = {
 } as const;
 export type PersonaId = keyof typeof PERSONAS;
 
+/** Interviewer tiers: how hard the interviewer pushes, independent of question difficulty. */
+export const TIERS = {
+  warmup: { label: "Warm-up", desc: "Patient and encouraging — good for a first attempt." },
+  standard: { label: "Standard", desc: "Like a typical SDE loop." },
+  tough: { label: "Tough", desc: "Demands precision and justification." },
+  bar_raiser: { label: "Bar raiser", desc: "Escalates until you hit your limit." },
+} as const;
+export type TierId = keyof typeof TIERS;
+
+/**
+ * Original characters for each interviewer style (fictional people; any resemblance is coincidental).
+ * The avatar is generated from `look`, never a photo.
+ */
+export const CHARACTERS: Record<PersonaId, { first: string; tier: TierId; look: { bg: string; fg: string; hair: 0 | 1 | 2 | 3; glasses: boolean } }> = {
+  mentor: { first: "Meera", tier: "warmup", look: { bg: "#34d399", fg: "#0b2e22", hair: 1, glasses: false } },
+  hr: { first: "Priya", tier: "warmup", look: { bg: "#f472b6", fg: "#3a0d24", hair: 2, glasses: false } },
+  professional: { first: "Arjun", tier: "standard", look: { bg: "#60a5fa", fg: "#0b1f3a", hair: 0, glasses: true } },
+  dsa: { first: "Ishaan", tier: "standard", look: { bg: "#a78bfa", fg: "#1d1240", hair: 3, glasses: true } },
+  behavioral: { first: "Sam", tier: "standard", look: { bg: "#fbbf24", fg: "#3a2a05", hair: 1, glasses: false } },
+  strict: { first: "Kavya", tier: "tough", look: { bg: "#fb923c", fg: "#3a1705", hair: 2, glasses: true } },
+  skeptic: { first: "Rohan", tier: "tough", look: { bg: "#f87171", fg: "#3a0b0b", hair: 0, glasses: false } },
+  architect: { first: "Nisha", tier: "tough", look: { bg: "#22d3ee", fg: "#06303a", hair: 3, glasses: true } },
+  bar_raiser: { first: "Vikram", tier: "bar_raiser", look: { bg: "#ffd43b", fg: "#2b2405", hair: 0, glasses: true } },
+};
+
 export const KINDS = {
   resume_screen: { name: "Resume-based interview", defaultPersona: "skeptic", coding: false },
   project: { name: "Project deep dive", defaultPersona: "skeptic", coding: false },

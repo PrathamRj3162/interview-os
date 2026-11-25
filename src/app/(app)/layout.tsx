@@ -4,6 +4,7 @@ import { signOut } from "@/app/actions/auth";
 import { Logo } from "@/components/logo";
 import { NavLinks } from "@/components/shell/nav-links";
 import { MobileNav } from "@/components/shell/mobile-nav";
+import { NotificationBell } from "@/components/shell/bell";
 import { getCurrentUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile-data";
 
@@ -17,7 +18,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-dvh">
       <aside data-app-chrome className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface/60 p-4 lg:flex">
-        <div className="mb-6 px-2"><Logo href="/dashboard" /></div>
+        <div className="mb-6 flex items-center justify-between px-2"><Logo href="/dashboard" /><NotificationBell /></div>
         <nav aria-label="Main" className="flex-1 overflow-y-auto"><NavLinks /></nav>
         <div className="border-t border-border pt-3">
           <p className="truncate px-3 text-sm font-medium">{name}</p>
@@ -33,11 +34,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <header data-app-chrome className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-bg/85 px-4 py-2 backdrop-blur-md lg:hidden">
           <MobileNav />
           <Logo href="/dashboard" />
+          <div className="flex items-center">
+          <NotificationBell align="right" />
           <form action={signOut}>
             <button type="submit" className="grid size-10 place-items-center rounded-lg hover:bg-surface-2" aria-label="Sign out">
               <LogOut className="size-5" />
             </button>
           </form>
+          </div>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 lg:px-10">{children}</main>
       </div>

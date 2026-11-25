@@ -2,11 +2,12 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { requireUser } from "@/lib/supabase/server";
+import { requireUser, getCurrentUser } from "@/lib/supabase/server";
 import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS } from "@/lib/interview/config";
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
 import { PROBLEMS, PROBLEM_BY_SLUG, DIFFICULTY_POOL } from "@/lib/dsa/bank";
 import { initialWorkspace } from "@/lib/dsa/server";
+import { COMPANY_BY_NAME } from "@/lib/interview/companies";
 import { fieldErrorsFrom, type ActionState } from "./types";
 
 const keys = <T extends object>(o: T) => Object.keys(o) as [string, ...string[]];
@@ -50,7 +51,11 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
     if (!slug) {
       const { data: done } = await supabase.from("submissions").select("problem_slug").eq("user_id", user.id).eq("status", "accepted").limit(500);
       const solved = new Set((done ?? []).map((d) => d.problem_slug));
-      const pool = PROBLEMS.filter((p) => DIFFICULTY_POOL[parsed.data.difficulty].includes(p.difficulty));
+      let pool = PROBLEMS.filter((p) => DIFFICULTY_POOL[parsed.data.difficulty].includes(p.difficulty));
+      // Company style practice: favour that company's commonly reported topics when any match.
+      const focus = parsed.data.company ? COMPANY_BY_NAME[parsed.data.company]?.dsaTopics ?? [] : [];
+      const styled = pool.filter((p) => p.topics.some((t) => focus.includes(t)));
+      if (styled.length) pool = styled;
       const fresh = pool.filter((p) => !solved.has(p.slug));
       const from = fresh.length ? fresh : pool;
       slug = from[Math.floor(Math.random() * from.length)].slug;
@@ -71,4 +76,23 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
       : "Could not start the interview. Please try again." };
   }
   redirect(`/interview/${data.id}`);
+}
+
+const ratingSchema = z.object({
+  id: z.string().uuid(),
+  rating: z.coerce.number().int().min(1).max(5),
+  note: z.string().trim().max(500).optional().default(""),
+});
+
+/** Candidate's emoji rating of an interview (their own row only — RLS + column grant). */
+export async function rateInterview(input: { id: string; rating: number; note?: string }): Promise<{ ok: boolean; message?: string }> {
+  const parsed = ratingSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Invalid rating." };
+  const { supabase, user } = await getCurrentUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+  const { data, error } = await supabase.from("mock_interviews")
+    .update({ user_rating: parsed.data.rating, rating_note: parsed.data.note || null })
+    .eq("id", parsed.data.id).eq("user_id", user.id).select("id");
+  if (error || !data?.length) return { ok: false, message: "Couldn't save your rating." };
+  return { ok: true };
 }

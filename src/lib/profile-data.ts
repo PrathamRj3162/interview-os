@@ -16,6 +16,11 @@ export type Profile = {
   learning_style: string | null;
   ai_resume_consent: boolean;
   onboarded_at: string | null;
+  /** Opt-in public profile (migration 0005). */
+  is_public?: boolean;
+  public_handle?: string | null;
+  public_show_scores?: boolean;
+  notifications_seen_at?: string | null;
 };
 
 export async function getProfile(supabase: SupabaseClient, userId: string): Promise<Profile | null> {

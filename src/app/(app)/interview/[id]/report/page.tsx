@@ -13,6 +13,9 @@ import { fmtClock, type CodeNote, type NoteKind } from "@/lib/interview/metrics"
 import type { Level } from "@/lib/interview/verdict";
 import { cn } from "@/lib/utils";
 import { DIFF_MULT } from "@/lib/progress/xp";
+import { harder } from "@/lib/interview/suggest";
+import { InterviewRating } from "@/components/interview/rating";
+import { Repeat, ArrowUpRight, Shuffle } from "lucide-react";
 
 export const metadata: Metadata = { title: "Interview report" };
 
@@ -51,7 +54,14 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const sameScale = prev && String(prev.version ?? "1") === String(r.version);
   const delta = sameScale && prev?.overall_score != null && r.overall != null ? Math.round(r.overall - Number(prev.overall_score)) : null;
   const xpEarned = r.overall != null && r.communication.answers >= 3 ? Math.round(r.overall * (DIFF_MULT[iv.difficulty] ?? 1)) : 0;
-  const again = `/interview/new?kind=${iv.kind}${iv.resume_id ? `&resume=${iv.resume_id}` : ""}${r.dsa ? `&problem=${r.dsa.problem.slug}` : ""}`;
+  const base = `/interview/new?kind=${iv.kind}&persona=${iv.persona}${iv.resume_id ? `&resume=${iv.resume_id}` : ""}`;
+  const again = `${base}&difficulty=${iv.difficulty}${r.dsa ? `&problem=${r.dsa.problem.slug}` : ""}`;
+  const harderDiff = harder(iv.difficulty);
+  const harderProblem = r.dsa?.next?.find((n) => ["easy", "medium", "hard"].indexOf(n.difficulty) > ["easy", "medium", "hard"].indexOf(r.dsa!.problem.difficulty)) ?? r.dsa?.next?.[0];
+  const nextHarder = `${base}&difficulty=${harderDiff}${harderProblem ? `&problem=${harderProblem.slug}` : ""}`;
+  const { data: kindsDone } = await supabase.from("mock_interviews").select("kind").eq("status", "completed").limit(500);
+  const doneKinds = new Set((kindsDone ?? []).map((k) => k.kind));
+  const otherKind = (["dsa", "behavioral", "hld", "fundamentals", "project", "lld", "resume_screen", "hr"] as const).find((k) => k !== iv.kind && !doneKinds.has(k)) ?? (iv.kind === "dsa" ? "behavioral" : "dsa");
 
   return (
     <article className="space-y-8">
@@ -109,6 +119,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       )}
 
       {r.metrics && <MetricsStrip r={r} />}
+      {r.integrity && r.integrity.pastedAnswers > 0 && (
+        <Card className="flex gap-3 border-warning/40 text-sm" data-testid="paste-flag">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+          <p><span className="font-medium">Pasted text detected:</span> {r.integrity.pastedAnswers} answer{r.integrity.pastedAnswers === 1 ? "" : "s"} included pasted text ({r.integrity.pastedChars.toLocaleString("en-IN")} characters). In a real interview you&apos;d answer in your own words — practise saying it, not reading it. This flag doesn&apos;t change your scores.</p>
+        </Card>
+      )}
 
       {r.dsa && <DsaSection d={r.dsa} code={r.code} />}
       {!r.dsa && r.code && (
@@ -189,6 +205,18 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
             </li>
           ))}
         </ol>
+      </section>
+      <section aria-labelledby="next-h" className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <h2 id="next-h" className="font-medium">What next</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link href={again} className={buttonClasses("secondary", "sm")}><Repeat className="size-4" aria-hidden />Retry{r.dsa ? " this problem" : " this round"}</Link>
+            {harderDiff !== iv.difficulty && <Link href={nextHarder} className={buttonClasses("primary", "sm")} data-testid="next-harder"><ArrowUpRight className="size-4" aria-hidden />Next harder ({harderDiff}{harderProblem && r.dsa ? ` · ${harderProblem.title}` : ""})</Link>}
+            <Link href={`/interview/new?kind=${otherKind}`} className={buttonClasses("secondary", "sm")}><Shuffle className="size-4" aria-hidden />Different round: {KINDS[otherKind]?.name}</Link>
+          </div>
+          <p className="mt-3 text-xs text-muted">The setup opens with these choices filled in; you can change anything before starting.</p>
+        </Card>
+        <Card><InterviewRating id={iv.id} initial={iv.user_rating} initialNote={iv.rating_note} /></Card>
       </section>
       <p className="text-xs text-muted">Evaluated by {r.provider} · {r.model}. AI feedback can be wrong — verify technical points against official documentation.</p>
     </article>

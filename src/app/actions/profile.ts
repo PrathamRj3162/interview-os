@@ -62,3 +62,22 @@ export async function deleteAccount(_: ActionState, fd: FormData): Promise<Actio
   await supabase.auth.signOut();
   redirect("/?deleted=1");
 }
+
+const RESERVED = new Set(["admin", "api", "app", "dashboard", "help", "interview", "login", "logout", "me", "new", "progress", "root", "settings", "signup", "support", "system", "user", "users"]);
+
+/** Opt-in public profile: a handle and two switches. Off by default; turning it off hides the page immediately. */
+export async function setPublicProfile(_: ActionState, fd: FormData): Promise<ActionState> {
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
+  const isPublic = fd.get("is_public") === "on";
+  const showScores = fd.get("public_show_scores") === "on";
+  const handle = String(fd.get("public_handle") ?? "").trim().toLowerCase();
+  const values = { is_public: isPublic, public_show_scores: showScores, public_handle: handle };
+  if (handle && !/^[a-z0-9_]{3,24}$/.test(handle)) return { values, fieldErrors: { public_handle: "3–24 characters: lowercase letters, numbers and _." } };
+  if (handle && RESERVED.has(handle)) return { values, fieldErrors: { public_handle: "That handle is reserved. Pick another." } };
+  if (isPublic && !handle) return { values, fieldErrors: { public_handle: "Choose a handle to make your profile public." } };
+  const { error } = await supabase.from("profiles").update({ is_public: isPublic, public_show_scores: showScores, public_handle: handle || null }).eq("id", user.id);
+  if (error) return { values, ...(error.code === "23505" ? { fieldErrors: { public_handle: "That handle is taken." } } : { message: "Couldn't save. Please try again." }) };
+  revalidatePath("/settings");
+  return { ok: true, message: isPublic ? `Public profile is on: /u/${handle}` : "Public profile is off." };
+}
