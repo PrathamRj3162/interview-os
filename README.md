@@ -26,6 +26,11 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 79 problems (incl. linked lists and trees) with hidden tests and timed worst-case stress tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
 | Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
 | **Progress & XP**: XP from interviews, solves, tasks and streaks (published formula), levels, 7 tiers × 3 divisions, decay with a tier floor, 18 dated achievements, personal bests, weekly recap, 30-day XP chart, mistake notebook | ✅ |
+| **Company styles**: 25 companies (big tech, Indian product, fintech, enterprise, services) — commonly reported loop, focus areas, DSA topics and behavioural themes, labelled "style practice — not actual company questions"; shapes the interviewer and DSA problem choice | ✅ |
+| **Interviewers**: 9 original characters with generated avatars and tiers (Warm-up, Standard, Tough, Bar raiser) | ✅ |
+| **Next steps**: suggested difficulty from your recent verdicts; Retry / Next harder / Different round; emoji rating; paste detection flagged in reports | ✅ |
+| **Notifications** (in-app bell: reports, tasks due, streak at risk, decay, achievements) and an **opt-in public profile** (`/u/handle`, noindex, server-verified stats) | ✅ |
+| Resume checks include bullet length (5–30 words) and dates (one format, valid ranges, newest first, Expected for future) | ✅ |
 | CS fundamentals academy, system design lab | 🚧 planned |
 
 ## Tech stack

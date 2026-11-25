@@ -102,14 +102,14 @@
 <img class="shot" src="../redesign/after/interview-setup.png" alt="Interview setup">
 <ol>
   <li><b>Round:</b> resume-based, project deep dive, DSA and live coding (see section 6), CS fundamentals, low-level design, high-level system design, behavioral, HR, a complete SDE mock, or company-style.</li>
-  <li><b>Interviewer:</b> nine styles that genuinely change how questions are asked — Friendly Mentor, Professional, Strict Senior Engineer, Skeptical Project Evaluator, DSA Specialist, System Design Architect, HR, Behavioral, and Bar Raiser. Also choose difficulty (Beginner → Expert) and mode:
+  <li><b>Interviewer:</b> nine original characters, each a style that genuinely changes how questions are asked, with a tier showing how hard they push — <i>Warm-up</i>: Meera (Friendly Mentor), Priya (HR); <i>Standard</i>: Arjun (Professional), Ishaan (DSA Specialist), Sam (Behavioral); <i>Tough</i>: Kavya (Strict Senior Engineer), Rohan (Skeptical Project Evaluator), Nisha (System Design Architect); <i>Bar raiser</i>: Vikram. Then choose difficulty (Beginner → Expert; a <b>suggested</b> level based on your last verdict in that round is pre-selected) and mode:
     <ul><li><b>Mock</b>: realistic. No hints, and answers are never revealed.</li><li><b>Practice</b>: a <b>Hint</b> button is available, and the interviewer may point out misconceptions.</li></ul></li>
   <li><b>Details:</b> duration, voice or typing, which resume to use, programming language and company style. Check the summary, then press <b>Start interview</b>.</li>
 </ol>
 <h3>In the interview room</h3>
 <ul>
   <li>The interviewer asks one question at a time and follows up on what you actually said: it challenges vague answers, asks for specifics, and never repeats a question you've already answered.</li>
-  <li><b>Voice mode:</b> questions are read aloud and you answer by speaking; your words appear in the answer box, where you can edit them before sending. It is turn-based browser speech, not a real-time voice model. Works best in Chrome, Edge or Safari. No audio is ever stored — only the text.</li>
+  <li><b>Voice mode:</b> questions are read aloud and you answer by speaking; your words appear in the answer box. When you pause, a 1.5-second <b>Sending in…</b> countdown starts — keep talking or press <b>Don't send</b> to cancel. Speaking while the interviewer talks interrupts it (best with headphones). See section 9 for voice settings and the mic check. No audio is ever stored — only the text.</li>
   <li><b>Editor:</b> for coding and design rounds, write code in the editor panel; it is sent along with your next answer.</li>
   <li><b>Controls:</b> mic on/off, interviewer voice on/off, auto-listen, editor, hint (practice only), pause, focus mode and end.</li>
 </ul>
@@ -169,11 +169,49 @@
   <li><b>Rubric (1–4):</b> every category has a written meaning for each score, and the report shows what yours means. Scores must be backed by <i>exact quotes</i> from your answers, shown with the time you said them; quotes that can't be found in your transcript are discarded, and a category with no real evidence stays unscored. In coding rounds, <b>Correctness comes from the code judge</b>, not the AI.</li>
   <li><b>Annotated final code:</b> notes under the exact lines they refer to (bug, edge case, complexity, style, good). A note must quote your code; notes that don't match are discarded.</li>
   <li><b>Practise next</b> (coding rounds): two related problems, a step harder, that you haven't solved. <b>Retry this problem</b> starts the same one again.</li>
+  <li><b>What next:</b> <b>Retry</b> the same round, <b>Next harder</b> (one difficulty up, and a harder related problem for coding rounds), or a <b>Different round</b> you haven't tried — the setup opens pre-filled. Rate how the interview felt with one tap (optional note).</li>
+  <li><b>Pasted text:</b> if an answer included 80+ pasted characters, the report says so. It doesn't change any score — it's a nudge to practise answering in your own words.</li>
   <li><b>Strengths, weaknesses, important mistakes, communication</b> (filler words per 100 words, counted directly; accent and voice are never assessed) and <b>question-by-question feedback</b>.</li>
 </ul>
 <div class="warn">The verdict is a practice signal with a published method. It is not a hiring decision or a prediction of selection. Reports created before 25 November 2026 keep their original 1–5 scale and have no verdict.</div>
 
-<h2>8. Settings and privacy</h2>
+<h2 class="break">8. Progress, ranks and achievements</h2>
+<p>Open <b>Progress &amp; XP</b> in the sidebar. Everything is recomputed from what you actually did, so there is no number to game or lose.</p>
+<table>
+  <tr><th>You do</th><th>You earn</th></tr>
+  <tr><td>Complete an interview (3+ answers)</td><td>Overall score × difficulty (Beginner 0.6 · Easy 0.8 · Medium 1.0 · Hard 1.3 · Expert 1.6)</td></tr>
+  <tr><td>Get a problem accepted for the first time</td><td>Easy 20 · Medium 40 · Hard 80; half with 2+ hints; +10 if your first submission was accepted</td></tr>
+  <tr><td>Finish a task</td><td>+10 each, up to 30 a day</td></tr>
+  <tr><td>Practise on consecutive days</td><td>+5 × streak length (up to 10) every active day</td></tr>
+</table>
+<ul>
+  <li><b>Ranks:</b> Intern → Junior → SDE-1 → SDE-2 → Senior → Staff → Principal, each with divisions III, II, I. Level <i>k</i> needs 150 × k<sup>1.6</sup> XP.</li>
+  <li><b>Decay:</b> after 7 days without activity, XP drops 1% a day — never below the start of your tier. Any activity stops it.</li>
+  <li><b>Achievements</b> (18, each with the date you earned it), <b>personal bests</b>, a <b>weekly recap</b> against the previous week, a 30-day XP chart and the reason for every point.</li>
+  <li><b>Mistake notebook:</b> concepts you missed across all reports (counted), every important mistake linked to its report, and problems you attempted but haven't solved (with Retry).</li>
+</ul>
+
+<h2>9. Voice interviews</h2>
+<ul>
+  <li><b>Mic check</b> (linked from setup and the room): pick your microphone, see the live level and background-noise reading with advice, record 5 seconds and play it back (it never leaves the tab), test speech recognition and both interviewer voices.</li>
+  <li><b>Voice settings</b> (the sliders icon in the room): listening engine, interviewer voice, auto-send on/off, how long a pause ends an answer (0.8–3 s), and interrupting by speaking.</li>
+  <li><b>Natural voice:</b> an optional, more natural interviewer voice (Kokoro) that runs entirely on your device after a one-time ~90 MB download. It is slower on older devices; the browser voice is instant.</li>
+  <li><b>Whisper:</b> more accurate transcription on the server, available only when the site owner has configured a Groq key. If it isn't configured, the option says so and your browser's recognition is used.</li>
+  <li>A small readout shows how long each step took on your device: speech-to-text, the interviewer's reply, and the first spoken word.</li>
+</ul>
+
+<h2 class="break">10. Company styles</h2>
+<p><b>Company styles</b> in the sidebar lists 25 companies — big tech, Indian product companies, fintech, enterprise and services — with each one's commonly reported loop, what to emphasise, the DSA topics to favour and behavioural themes. Pick <b>Company-style loop</b> or <b>DSA in this style</b>: the interviewer adapts its focus and DSA rounds favour those topics.</p>
+<div class="warn">Style practice — not actual company questions. The summaries come from public candidate write-ups and careers pages, loops vary by team, and questions are always generated fresh.</div>
+
+<h2>11. Notifications and your public profile</h2>
+<ul>
+  <li><b>The bell</b> (top of the sidebar, or the header on phones) shows reports that are ready or need a retry, tasks due today, a streak at risk, XP decay and new achievements. Nothing is emailed or pushed.</li>
+  <li><b>Public profile</b> (Settings → Privacy) is off by default. Turn it on with a handle to get a shareable page at <code>/u/your_handle</code> showing your first name, target role, rank, XP, streak, achievements and practice counts — and optionally your scores. It never shows your resume, email, transcripts or code, isn't listed in search engines, and disappears the moment you turn it off.</li>
+  <li>Stats on public pages can't be edited by hand: scores and accepted submissions are only ever written by the server.</li>
+</ul>
+
+<h2>12. Settings and privacy</h2>
 <ul>
   <li><b>Appearance:</b> choose the <b>Neon</b> or <b>High contrast</b> theme, and the <b>Vibe</b>: Gen-Z (casual wording in menus and empty states) or Professional. Reports always stay professional.</li>
   <li><b>Preparation profile:</b> edit anything from onboarding.</li>
@@ -181,10 +219,10 @@
   <li><b>Delete account:</b> type DELETE to permanently remove your account, resumes and files, interviews and tasks.</li>
 </ul>
 
-<h2>9. Coming next</h2>
-<p>These are planned and shown under "Coming soon" in the sidebar: tiers, XP and achievements, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, progress charts, and a more natural voice mode.</p>
+<h2>13. Coming next</h2>
+<p>These are planned and shown under "Coming soon" in the sidebar: a DSA academy with lessons, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, a study planner and spaced-repetition revision.</p>
 
-<h2>10. Tips for getting the most out of it</h2>
+<h2>14. Tips for getting the most out of it</h2>
 <ol>
   <li>Upload your <b>real</b> resume first. Everything gets sharper with it.</li>
   <li>Start in <b>Practice</b> mode at a comfortable difficulty, then switch to <b>Mock</b>.</li>

@@ -20,3 +20,10 @@ Static content (problems, lessons, quizzes) is referenced by `slug` and lives in
 - `submissions.interview_id`, `submissions.results` (summary only: status, counts, first failure).
 - `interview_events` — append-only room log (`run`, `remote_run`, `submit`, `paste`, `idle`, `language`, `hint`, `phase`, `reset`). RLS: users can read and insert their own rows, and only into their own interviews; no update/delete.
 - Problems, hints and hidden tests are **not** stored in the database: they live in `src/lib/dsa` and hidden-test expectations are computed from reference solutions with a seeded generator.
+
+## 0005 — Public profiles, ratings, hardening
+- `profiles`: `public_handle` (unique, `^[a-z0-9_]{3,24}$`), `is_public` (default false), `public_show_scores`, `notifications_seen_at`.
+- `mock_interviews`: `user_rating` (1–5), `rating_note` (≤500).
+- **Server-only writes.** `authenticated` may insert only the setup columns of `mock_interviews` and update only `phase`, `workspace`, `user_rating`, `rating_note`; it can no longer insert/update `submissions`. Status, report, score and judge submissions are written by the service role inside the app, always scoped by `user_id`. TRUNCATE/REFERENCES/TRIGGER revoked from API roles.
+- `public_profile(handle)` — `security definer`, returns JSON only when the owner opted in: first name, role, join date and the activity metadata the XP engine needs (no transcripts, resume, code or email). Executable by `anon`.
+

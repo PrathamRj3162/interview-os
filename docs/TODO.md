@@ -15,6 +15,7 @@
   - [x] Progress: tiers/XP/achievements, charts, mistake notebook (v0.6.0)
   - [x] Voice v2: VAD, auto-send, barge-in, Whisper (Groq, when configured) / Kokoro TTS, sentence streaming, latency display, mic check (v0.7.0)
   - [x] Linked-list / tree problems; timed stress tests for slow solutions (v0.4.1)
-- [ ] Phase 8 — Planner, analytics, revision (SM-2 flashcards, mistake notebook)
+- [x] Sakshaat gap items: company styles, interviewer tiers/avatars, ATS bullet/date checks, suggested difficulty + next steps, notifications, paste flags, emoji rating, public profile (v0.8.0)
+- [ ] Phase 8 — Planner, revision (SM-2 flashcards); mistake notebook shipped in v0.6.0
 - [ ] Phase 9 — Playwright E2E, security pass
 - [~] Phase 10 — Vercel project `interview-os` created, env configured, production build live behind Vercel auth; pending: migrations 0002/0003, public access, Supabase URL config, SMTP, keep-alive job

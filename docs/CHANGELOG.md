@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0 — 2026-11-25 · Company styles, interviewers, next steps, notifications, public profiles
+- Security: interview status/report/score and judge submissions are server-only writes (migration 0005, column grants); users could previously have set them through the Data API with their own session. TRUNCATE/REFERENCES/TRIGGER revoked from API roles. Covered by an E2E test that tries the forged writes with a real user session.
+- Company style map for 25 companies with a clear "style practice — not actual company questions" label; it steers the interviewer prompt and favours matching DSA topics. New Company styles page.
+- Interviewers are original characters (Meera, Priya, Arjun, Ishaan, Sam, Kavya, Rohan, Nisha, Vikram) with generated SVG avatars and tiers: Warm-up, Standard, Tough, Bar raiser.
+- Suggested difficulty per round from your latest verdicts (published rules); report "What next": Retry, Next harder (with a harder related problem for DSA), Different round. Setup accepts `difficulty`, `persona`, `company`, `problem` parameters.
+- Emoji rating (1–5 + optional note) on reports.
+- Paste detection in typed answers (80+ characters), flagged in the report without affecting scores.
+- In-app notifications (bell): reports ready or needing a retry, tasks due, streak at risk, XP decay, new achievements; mark all read. No email or push.
+- Opt-in public profile at `/u/:handle`: rank, XP, streak, achievements, solved/interview counts, optional scores; never resume, transcripts, code or email; not indexed.
+- Resume checks: bullet length and date consistency/order/validity.
+
 ## 0.7.0 — 2026-11-25 · Voice v2
 - On-device voice activity detection (`lib/voice/vad.ts`): adaptive noise floor, hysteresis, ignores clicks; a stricter mode while the interviewer talks so speaker echo doesn't count.
 - Auto-send after you stop talking, with a visible 1.5 s countdown you can cancel by talking or pressing "Don't send"; adjustable pause length (0.8–3 s).
