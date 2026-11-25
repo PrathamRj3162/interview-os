@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-11-25 · DSA round: lists, trees, slow-solution detection
+- Linked lists and binary trees: new `ListNode` / `TreeNode` value types in all four harnesses (JSON arrays in, real nodes for the solution, arrays out; cycle-safe), node classes predefined and shown above the starter. 20 new problems (79 total).
+- Timed stress tests: 22 problems end Submit with one large worst-case input. Each call is timed inside the harness; a correct but slow answer is "Too slow" (status `time_limit`) with an explanation, and a judge timeout that only the stress input missed is reported as a complexity problem. Calibrated on Judge0 CE (brute force flagged in all four languages; optimal 0.4–370 ms vs 1–5 s budgets).
+- Python Run never waits for Pyodide: it starts downloading on the setup page, Run falls back to the judge until it's ready, a "Py loading / Py ready" indicator shows the state, and the worker reloads immediately after a timeout.
+- User guide (PDF) has a new chapter on the DSA round.
+
 ## 0.4.0 — 2026-11-25 · DSA live-coding round
 - New "DSA & live coding" round: resizable problem | editor | interviewer layout (tabs on mobile), focus mode by default.
 - CodeMirror 6 editor for Python, JavaScript, C++ and Java: starter code per signature, per-language autosave (browser + server), reset, Ctrl/⌘+' Run, Ctrl/⌘+Shift+Enter Submit.

@@ -23,7 +23,7 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | Voice mode (browser speech recognition + speech synthesis, turn-based, barge-in, text fallback) | ✅ |
 | **Reports**: rubric per round, evidence quotes checked against your transcript, deterministic overall score, per-question feedback, filler-word stats | ✅ |
 | Dashboard: today's tasks from report priorities, data-driven next step | ✅ |
-| **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 59 problems with hidden tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
+| **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 79 problems (incl. linked lists and trees) with hidden tests and timed worst-case stress tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
 | Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
 | Report v2 with hire verdict, tiers/XP, voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
 

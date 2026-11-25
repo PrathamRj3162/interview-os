@@ -101,7 +101,7 @@
 <h3>Set up a round (3 quick steps)</h3>
 <img class="shot" src="../redesign/after/interview-setup.png" alt="Interview setup">
 <ol>
-  <li><b>Round:</b> resume-based, project deep dive, DSA and live coding, CS fundamentals, low-level design, high-level system design, behavioral, HR, a complete SDE mock, or company-style.</li>
+  <li><b>Round:</b> resume-based, project deep dive, DSA and live coding (see section 6), CS fundamentals, low-level design, high-level system design, behavioral, HR, a complete SDE mock, or company-style.</li>
   <li><b>Interviewer:</b> nine styles that genuinely change how questions are asked — Friendly Mentor, Professional, Strict Senior Engineer, Skeptical Project Evaluator, DSA Specialist, System Design Architect, HR, Behavioral, and Bar Raiser. Also choose difficulty (Beginner → Expert) and mode:
     <ul><li><b>Mock</b>: realistic. No hints, and answers are never revealed.</li><li><b>Practice</b>: a <b>Hint</b> button is available, and the interviewer may point out misconceptions.</li></ul></li>
   <li><b>Details:</b> duration, voice or typing, which resume to use, programming language and company style. Check the summary, then press <b>Start interview</b>.</li>
@@ -122,7 +122,39 @@
 </table>
 <div class="tip">If the AI provider is busy, your answer is still saved. Press <b>Retry</b> and the interviewer picks up where it left off. Reloading the page never restarts the interview.</div>
 
-<h2 class="break">6. Your interview report</h2>
+<h2 class="break">6. The DSA live-coding round</h2>
+<p>Choose <b>DSA &amp; live coding</b> when setting up a round. In the last step pick a problem (or leave it on <b>Pick one for me</b>, which chooses one you haven't solved at your difficulty) and a language: <b>Python, JavaScript, C++ or Java</b>.</p>
+<img class="shot" src="../screenshots/dsa-room.png" alt="DSA room: problem, editor and interviewer side by side">
+<h3>The room</h3>
+<ul>
+  <li><b>Three panes:</b> the problem on the left, the code editor in the middle, the interviewer on the right. Drag the dividers (or focus one and use the arrow keys) to resize. On a phone the panes become tabs.</li>
+  <li><b>79 problems</b> across arrays, two pointers, sliding window, stacks, binary search, intervals, dynamic programming, graphs, backtracking, matrices, <b>linked lists and binary trees</b>. Statements are written for Interview OS.</li>
+  <li><b>Linked lists and trees</b> are written as arrays: a list as its values in order (<code>[1, 2, 3]</code> is 1 → 2 → 3) and a tree in level order with <code>null</code> for a missing child. In your code they are real <code>ListNode</code> / <code>TreeNode</code> objects; the class is already defined (it's shown as a comment above the starter, as on most coding sites).</li>
+  <li><b>Autosave:</b> your code is saved in the browser and on the server, separately per language, so a reload or a crash never loses it. <b>Reset</b> restores the starter code (after you confirm).</li>
+</ul>
+<h3>Run and Submit</h3>
+<ul>
+  <li><b>Run</b> checks the examples from the statement. Python and JavaScript run <b>inside your browser</b>; C++ and Java run on the free public <b>Judge0</b> service. Python needs a one-time download of about 10 MB; it starts as soon as you pick Python on the setup page, and until it's ready, Run quietly uses the judge instead so you never wait. A small <b>Py loading / Py ready</b> label shows its state.</li>
+  <li><b>Submit</b> runs every hidden test on the judge. You see how many passed; only the first failing hidden test is shown in full, so you can debug without seeing the whole test set.</li>
+  <li><b>Slow solutions are caught.</b> For 22 problems where brute force is much slower than the best approach, Submit ends with one large worst-case input that is timed. A correct but too-slow answer is marked <b>Too slow</b>, and the result explains that the approach needs a better time complexity.</li>
+  <li>Errors point at <b>your</b> line numbers, not the hidden test harness.</li>
+</ul>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>'</kbd></td><td>Run the examples</td></tr>
+  <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Shift</kbd> + <kbd>Enter</kbd></td><td>Submit</td></tr>
+</table>
+<h3>The interviewer</h3>
+<ul>
+  <li>It sees your current code, what changed since your last message, and every Run and Submit result, plus large pastes, long pauses, language switches and hints. Comments about your code are grounded in those facts.</li>
+  <li>It guides you through the stages of a real coding interview, shown in the stepper at the top: <b>Intro → Clarify → Brute force → Optimise → Code → Test → Complexity → Wrap-up</b>.</li>
+  <li><b>Mock mode</b> gives no hints and never names the algorithm. <b>Practice mode</b> offers three pre-written hints per problem, each more specific than the last (they don't use your AI quota).</li>
+</ul>
+<h3>In the report</h3>
+<p>A <b>Coding</b> section with facts measured by the platform, not judged by AI: the judge result and tests passed, the number of runs, hints used, large pastes, the stages you reached, your final code, and the optimal approach with its time and space complexity (revealed only after the interview).</p>
+<div class="warn">Code you Submit, and C++/Java Runs, are sent to the free public Judge0 service — a third party. Each account gets 80 judge calls a day so the free service stays usable for everyone.</div>
+
+<h2 class="break">7. Your interview report</h2>
 <p>Press <b>End</b>, then <b>Yes, end</b>. The report is ready in about 20–60 seconds and is saved permanently under <b>Mock interviews</b>.</p>
 <ul>
   <li><b>Overall score (0–100):</b> the average of the scored rubric categories. If you've done the same round before, you'll see your change since last time.</li>
@@ -134,7 +166,7 @@
 </ul>
 <div class="warn">Scores are practice feedback with a published method. They are not a hiring decision or a prediction of selection.</div>
 
-<h2>7. Settings and privacy</h2>
+<h2>8. Settings and privacy</h2>
 <ul>
   <li><b>Appearance:</b> choose the <b>Neon</b> or <b>High contrast</b> theme, and the <b>Vibe</b>: Gen-Z (casual wording in menus and empty states) or Professional. Reports always stay professional.</li>
   <li><b>Preparation profile:</b> edit anything from onboarding.</li>
@@ -142,10 +174,10 @@
   <li><b>Delete account:</b> type DELETE to permanently remove your account, resumes and files, interviews and tasks.</li>
 </ul>
 
-<h2>8. Coming next</h2>
-<p>These are planned and shown under "Coming soon" in the sidebar: a DSA live-coding round with real code execution (C++, Java, Python, JavaScript) and hidden tests, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, progress charts, tiers and achievements, and a more natural voice mode.</p>
+<h2>9. Coming next</h2>
+<p>These are planned and shown under "Coming soon" in the sidebar: a more detailed interview report with a hire / no-hire style verdict, a CS fundamentals academy, a system design lab, project analysis from GitHub repositories, progress charts, tiers and achievements, and a more natural voice mode.</p>
 
-<h2>9. Tips for getting the most out of it</h2>
+<h2>10. Tips for getting the most out of it</h2>
 <ol>
   <li>Upload your <b>real</b> resume first. Everything gets sharper with it.</li>
   <li>Start in <b>Practice</b> mode at a comfortable difficulty, then switch to <b>Mock</b>.</li>
