@@ -1,22 +1,29 @@
 # Roadmap
 
-- [x] Phase 0 — research & architecture
-- [x] Phase 1 — foundation, auth, onboarding, dashboard, settings
-- [x] Phase 1 verified against live Supabase (Playwright: login, onboarding, dashboard, persistence, settings, deletion)
-- [x] Phase 2 — Resume intelligence: upload (PDF/DOCX, magic-byte checks), extraction, transparent rule score, AI claims (verbatim-verified), rewrites, recruiter concerns, tailored standard questions
-  - [ ] Resume version comparison, role-specific resume export
-- [ ] Phase 3 — DSA academy: curriculum data, problems + tests, Monaco, in-browser JS/Python runner, adaptive next-problem
-- [ ] Phase 4 — CS fundamentals: lessons, deterministic quizzes
-- [ ] Phase 5 — System design lab: LLD/HLD content, Mermaid, guided simulator
-- [ ] Phase 6 — Project deep-dive + public GitHub repo analysis
-- [x] Phase 7 — Mock interview studio: 9 personas × 10 rounds × 5 difficulties, mock vs practice (hints), turn-based browser voice (STT+TTS, barge-in, mute, pause), text fallback, code panel, idempotent evidence-verified report, tasks into study plan
-  - [x] DSA live-coding round: CodeMirror 6, 79 problems (incl. lists/trees, stress tests v0.4.1), browser runners (Pyodide/JS) + Judge0, code-aware interviewer, phase machine, graded hints (v0.4.0)
-  - [x] Report v2: anchored 1–4 rubric, objective metrics, timestamped quotes, deterministic verdict, one thing to fix, drills, annotated code (v0.5.0)
-  - [x] Progress: tiers/XP/achievements, charts, mistake notebook (v0.6.0)
-  - [x] Voice v2: VAD, auto-send, barge-in, Whisper (Groq, when configured) / Kokoro TTS, sentence streaming, latency display, mic check (v0.7.0)
-  - [x] Linked-list / tree problems; timed stress tests for slow solutions (v0.4.1)
-- [x] Sakshaat gap items: company styles, interviewer tiers/avatars, ATS bullet/date checks, suggested difficulty + next steps, notifications, paste flags, emoji rating, public profile (v0.8.0)
-- [x] Phase 8 — Planner, revision (SM-2 flashcards), mistake notebook (v0.6.0 / v0.9.0)
-- [x] Phases 3–6 — DSA academy, CS fundamentals, system design lab, project deep-dive (v0.9.0)
-- [ ] Phase 9 — Playwright E2E, security pass
-- [~] Phase 10 — Vercel project `interview-os` created, env configured, production build live behind Vercel auth; pending: migrations 0002/0003, public access, Supabase URL config, SMTP, keep-alive job
+## Done
+- [x] Foundation: auth, onboarding, dashboard, settings, data deletion (v0.1–0.2)
+- [x] Resume intelligence: PDF/DOCX upload, explained rule score, verbatim-verified AI claims, rewrites, bullet/date checks (v0.2, v0.8)
+- [x] Mock interview studio: 9 interviewers × 10 rounds × 5 difficulties, mock vs practice, voice and text (v0.3)
+- [x] DSA live-coding round: CodeMirror 6, four languages, browser runners + Judge0, stress tests, graded hints (v0.4)
+- [x] Report v2: anchored rubric, measured metrics, rule-based verdict, drills, annotated code (v0.5)
+- [x] Progress: XP, tiers, achievements, bests, mistake notebook (v0.6)
+- [x] Voice v2: VAD, auto-send, barge-in, sentence streaming, Kokoro, mic check (v0.7)
+- [x] Company styles, interviewer tiers, next steps, notifications, public profiles (v0.8)
+- [x] DSA academy, CS fundamentals, revision (SM-2), study planner, system design lab, project deep-dive (v0.9)
+- [x] Live feel: streamed replies, live AI budget, Mumbai region, proactive nudges, Silero VAD, on-device Whisper, instant spoken feedback (v0.10)
+- [x] Integrity: server-only transcripts, enforced CSP, platform-only task XP, keep-alive job (v0.10)
+- [x] Content: 206 problems, 100 fundamentals questions, design diagrams + sketchpad (v0.10)
+- [x] Playwright E2E for every module, CI, gitleaks secret scan
+- [x] Deployed on Vercel (bom1) + Supabase (ap-south-1), migrations 0001–0009 applied
+
+## Open
+- [ ] Resume version comparison and role-specific resume export
+- [ ] Email notifications (needs a free SMTP sender; in-app bell only for now)
+- [ ] Self-hosted Judge0 (public CE is shared and rate-limited)
+- [ ] Interactive system design simulator (diagrams and sketchpad are static/reference today)
+- [ ] Adaptive next problem from solve history beyond "same topics, one step harder"
+
+## Known limits
+- Free AI tiers can be slow or rate-limited; turns fail honestly after 15 s rather than hanging.
+- Browser speech recognition sends audio to the browser vendor; choose on-device Whisper to avoid that.
+- Stress tests run on a shared free judge, so only problems where brute force is at least a factor of n slower have one.

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.10.0 — 2026-11-25 · Live feel, integrity, and a 206-problem bank
+**Live interviews**
+- Interviewer replies stream over SSE (`delta` events, then `done` with metadata and timing); speech starts at the first finished sentence.
+- Live AI budget for turns: fast providers first (Groq gpt-oss with low reasoning effort), 8 s per attempt, 15 s total, then an honest error instead of a long hang.
+- Database calls in a turn run in parallel batches, and the app now runs in Vercel's Mumbai region (`bom1`) next to Supabase (ap-south-1). Measured database round trip: 230–690 ms from `iad1` → 17–55 ms from `bom1` (`/api/health?db=1`).
+- Proactive interviewer in DSA rounds: after 90 s without editor activity, a failed Run/Submit, or a large paste, the interviewer checks in. Mock mode asks a probing question, never a hint; at most one nudge per 2 minutes; nudges count toward the daily AI limit.
+- Voice: Silero VAD (model-based pause detection, runs on the device) with the energy VAD as fallback, plus a noisy-room setting. Speech-to-text can now run on the device (Whisper tiny.en on CPU, base.en with WebGPU) in addition to the browser and the optional Groq Whisper. Kokoro always uses the smaller q8 model.
+- Instant feedback: when you end, a 3-sentence spoken summary arrives first, while the full report is built in the background with real progress stages. If the one-shot evaluation fails, a chunked evaluation (two categories per call) runs instead; a category that still fails stays unscored.
+
+**Integrity and security**
+- Interview transcripts (`interview_turns`) are server-only writes (migration 0009). Covered by an E2E test that tries a forged write with a real session.
+- Content-Security-Policy with per-request nonces, first report-only and now enforced (no violations seen). The JS runner uses a blob worker per run instead of `new Function`, and zod runs in jitless mode, so `unsafe-eval` isn't needed. Violations go to `/api/csp-report`.
+- Task XP counts only for platform-created tasks (migration 0007 `study_tasks.source`), so typing your own tasks can't farm XP.
+- Keep-alive: a GitHub Action calls a harmless `ping()` RPC (migration 0008) every 3 days so the free Supabase project isn't paused.
+- GitHub repo analysis uses 3 API calls plus raw file reads, a 24 h shared cache, and a clear message when GitHub's free limit is hit.
+
+**Content**
+- Problem bank: 79 → 206 problems (56 Easy / 110 Medium / 40 Hard), written for Interview OS. New topics include queue, trie, bit manipulation, union-find, prefix sums, math, knapsack/DP variants, heaps and topological sort. Each problem has hints, approach notes, a reference solution, seeded hidden tests, and (where brute force is a factor of n slower) a timed stress test. New validators for problems with several valid answers (alien dictionary, sudoku, reorganise string).
+- CS fundamentals: 60 → 100 questions. Quiz options are shown in a random order, so answers can't be guessed by position.
+- System design lab: a reference architecture or class diagram for every case, and an in-browser sketchpad (pen, box, eraser, PNG export) saved on your device only.
+
 ## 0.9.0 — 2026-11-25 · Learning modules: every sidebar item is live
 - DSA academy (`/dsa`): problem browser with topic/difficulty/status filters and search, problem pages with your submission history, 13 original pattern guides linked to bank problems by tag, "mark as studied".
 - CS fundamentals (`/fundamentals`): 60 original MCQs across OS, DBMS, networks and OOP; answer key server-only, graded by a server action, stored in `quiz_attempts`; explanations on the result page; every miss becomes a flashcard.

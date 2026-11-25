@@ -26,5 +26,8 @@ vercel --prod
 Then set `NEXT_PUBLIC_SITE_URL` to the production URL and update Supabase redirect URLs.
 Verify: `curl https://<domain>/api/health` → `"database":"configured"` and your AI providers listed.
 
-## 5. Keep Supabase awake (Phase 10)
-A scheduled GitHub Action will ping the database so the free project isn't paused for inactivity.
+## 5. Region
+`vercel.json` pins functions to `bom1` (Mumbai) to sit next to a Supabase project in `ap-south-1`. If your Supabase project is elsewhere, change it to the nearest Vercel region; check with `curl https://<domain>/api/health?db=1` (round trips should be tens of ms).
+
+## 6. Keep Supabase awake
+`.github/workflows/keepalive.yml` calls the `ping()` RPC every 3 days so the free project isn't paused. Add repository secrets `SUPABASE_URL` and `SUPABASE_ANON_KEY` (the public anon key — no service key needed).

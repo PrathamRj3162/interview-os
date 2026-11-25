@@ -108,6 +108,7 @@
 </ol>
 <h3>In the interview room</h3>
 <ul>
+  <li>Replies appear word by word as they are written, and in voice mode the interviewer starts speaking as soon as the first sentence is ready. If the AI provider doesn't answer within about 15 seconds you get a clear message and a <b>Retry</b> button instead of a long wait.</li>
   <li>The interviewer asks one question at a time and follows up on what you actually said: it challenges vague answers, asks for specifics, and never repeats a question you've already answered.</li>
   <li><b>Voice mode:</b> questions are read aloud and you answer by speaking; your words appear in the answer box. When you pause, a 1.5-second <b>Sending in…</b> countdown starts — keep talking or press <b>Don't send</b> to cancel. Speaking while the interviewer talks interrupts it (best with headphones). See section 9 for voice settings and the mic check. No audio is ever stored — only the text.</li>
   <li><b>Editor:</b> for coding and design rounds, write code in the editor panel; it is sent along with your next answer.</li>
@@ -128,7 +129,7 @@
 <h3>The room</h3>
 <ul>
   <li><b>Three panes:</b> the problem on the left, the code editor in the middle, the interviewer on the right. Drag the dividers (or focus one and use the arrow keys) to resize. On a phone the panes become tabs.</li>
-  <li><b>79 problems</b> across arrays, two pointers, sliding window, stacks, binary search, intervals, dynamic programming, graphs, backtracking, matrices, <b>linked lists and binary trees</b>. Statements are written for Interview OS.</li>
+  <li><b>206 problems</b> (56 Easy, 110 Medium, 40 Hard) across arrays, two pointers, sliding window, stacks and queues, binary search, intervals, heaps, tries, union-find, bit manipulation, prefix sums, math, dynamic programming (including knapsack variants), graphs and topological sort, backtracking, matrices, <b>linked lists and binary trees</b>. Statements are written for Interview OS.</li>
   <li><b>Linked lists and trees</b> are written as arrays: a list as its values in order (<code>[1, 2, 3]</code> is 1 → 2 → 3) and a tree in level order with <code>null</code> for a missing child. In your code they are real <code>ListNode</code> / <code>TreeNode</code> objects; the class is already defined (it's shown as a comment above the starter, as on most coding sites).</li>
   <li><b>Autosave:</b> your code is saved in the browser and on the server, separately per language, so a reload or a crash never loses it. <b>Reset</b> restores the starter code (after you confirm).</li>
 </ul>
@@ -136,7 +137,7 @@
 <ul>
   <li><b>Run</b> checks the examples from the statement. Python and JavaScript run <b>inside your browser</b>; C++ and Java run on the free public <b>Judge0</b> service. Python needs a one-time download of about 10 MB; it starts as soon as you pick Python on the setup page, and until it's ready, Run quietly uses the judge instead so you never wait. A small <b>Py loading / Py ready</b> label shows its state.</li>
   <li><b>Submit</b> runs every hidden test on the judge. You see how many passed; only the first failing hidden test is shown in full, so you can debug without seeing the whole test set.</li>
-  <li><b>Slow solutions are caught.</b> For 22 problems where brute force is much slower than the best approach, Submit ends with one large worst-case input that is timed. A correct but too-slow answer is marked <b>Too slow</b>, and the result explains that the approach needs a better time complexity.</li>
+  <li><b>Slow solutions are caught.</b> For 39 problems where brute force is much slower than the best approach, Submit ends with one large worst-case input that is timed. A correct but too-slow answer is marked <b>Too slow</b>, and the result explains that the approach needs a better time complexity.</li>
   <li>Errors point at <b>your</b> line numbers, not the hidden test harness.</li>
 </ul>
 <table>
@@ -148,6 +149,7 @@
 <ul>
   <li>It sees your current code, what changed since your last message, and every Run and Submit result, plus large pastes, long pauses, language switches and hints. Comments about your code are grounded in those facts.</li>
   <li>It guides you through the stages of a real coding interview, shown in the stepper at the top: <b>Intro → Clarify → Brute force → Optimise → Code → Test → Complexity → Wrap-up</b>.</li>
+  <li><b>It checks in on its own</b> if you go quiet for about 90 seconds while coding, after a failed Run or Submit, or after a large paste — at most once every 2 minutes. In Mock mode it only asks what you're thinking; it never gives a hint.</li>
   <li><b>Mock mode</b> gives no hints and never names the algorithm. <b>Practice mode</b> offers three pre-written hints per problem, each more specific than the last (they don't use your AI quota).</li>
 </ul>
 <h3>In the report</h3>
@@ -155,7 +157,7 @@
 <div class="warn">Code you Submit, and C++/Java Runs, are sent to the free public Judge0 service — a third party. Each account gets 80 judge calls a day so the free service stays usable for everyone.</div>
 
 <h2 class="break">7. Your interview report</h2>
-<p>Press <b>End</b>, then <b>Yes, end</b>. The report is ready in about 20–60 seconds and is saved permanently under <b>Mock interviews</b>.</p>
+<p>Press <b>End</b>, then <b>Yes, end</b>. Within a few seconds the interviewer gives you <b>three sentences of spoken feedback</b>, while the full report is built in the background — the screen shows each stage as it happens. The report is usually ready in 20–60 seconds and is saved permanently under <b>Mock interviews</b>. If the AI provider struggles with the full evaluation, it is done in smaller pieces instead; any category that still can't be evaluated is left unscored rather than guessed.</p>
 <ul>
   <li><b>Mock verdict:</b> <b>No Hire, Lean No, Lean Hire, Hire</b> or <b>Strong Hire</b>, with a 0–100 score. The AI never picks it. It is computed by fixed rules from your rubric scores, and <b>How the verdict was decided</b> shows every step:
     <ul>
@@ -181,7 +183,7 @@
   <tr><th>You do</th><th>You earn</th></tr>
   <tr><td>Complete an interview (3+ answers)</td><td>Overall score × difficulty (Beginner 0.6 · Easy 0.8 · Medium 1.0 · Hard 1.3 · Expert 1.6)</td></tr>
   <tr><td>Get a problem accepted for the first time</td><td>Easy 20 · Medium 40 · Hard 80; half with 2+ hints; +10 if your first submission was accepted</td></tr>
-  <tr><td>Finish a task</td><td>+10 each, up to 30 a day</td></tr>
+  <tr><td>Finish a task from a report or the planner</td><td>+10 each, up to 30 a day</td></tr>
   <tr><td>Practise on consecutive days</td><td>+5 × streak length (up to 10) every active day</td></tr>
 </table>
 <ul>
@@ -194,9 +196,10 @@
 <h2>9. Voice interviews</h2>
 <ul>
   <li><b>Mic check</b> (linked from setup and the room): pick your microphone, see the live level and background-noise reading with advice, record 5 seconds and play it back (it never leaves the tab), test speech recognition and both interviewer voices.</li>
-  <li><b>Voice settings</b> (the sliders icon in the room): listening engine, interviewer voice, auto-send on/off, how long a pause ends an answer (0.8–3 s), and interrupting by speaking.</li>
+  <li><b>Voice settings</b> (the sliders icon in the room): listening engine, interviewer voice, pause detection, auto-send on/off, how long a pause ends an answer (0.8–3 s), a <b>noisy room</b> option, and interrupting by speaking.</li>
+  <li><b>Pause detection:</b> a small speech-detection model (Silero) runs on your device to tell when you've finished talking, so background noise and keyboard clicks don't end your answer. If it can't load, a simpler loudness-based detector is used and the settings say so.</li>
   <li><b>Natural voice:</b> an optional, more natural interviewer voice (Kokoro) that runs entirely on your device after a one-time ~90 MB download. It is slower on older devices; the browser voice is instant.</li>
-  <li><b>Whisper:</b> more accurate transcription on the server, available only when the site owner has configured a Groq key. If it isn't configured, the option says so and your browser's recognition is used.</li>
+  <li><b>Listening engines:</b> <b>Browser</b> (instant, but Chrome sends audio to Google), <b>On-device Whisper</b> (a one-time ~40–80 MB download; your audio never leaves the device; faster on computers with WebGPU), or <b>Whisper via Groq</b> on the server when the site owner has configured a key. Unavailable options say why.</li>
   <li>A small readout shows how long each step took on your device: speech-to-text, the interviewer's reply, and the first spoken word.</li>
 </ul>
 
@@ -213,11 +216,11 @@
 
 <h2 class="break">12. Learning modules</h2>
 <ul>
-  <li><b>DSA academy:</b> browse all 79 problems by topic, difficulty or status (solved, attempted, not tried), and read 13 pattern guides — when to use each pattern, a template, the complexity and common mistakes — each linked to the problems that use it. <b>Practise</b> opens the problem as a live-coding round with hints; <b>Mock interview</b> opens it without hints.</li>
-  <li><b>CS fundamentals:</b> 10-question quizzes on operating systems, DBMS, networks and OOP, graded on the server with an explanation for every question. Your accuracy shows per topic and feeds the dashboard's readiness.</li>
+  <li><b>DSA academy:</b> browse all 206 problems by topic, difficulty or status (solved, attempted, not tried), and read 13 pattern guides — when to use each pattern, a template, the complexity and common mistakes — each linked to the problems that use it. <b>Practise</b> opens the problem as a live-coding round with hints; <b>Mock interview</b> opens it without hints.</li>
+  <li><b>CS fundamentals:</b> 100 questions; 10-question quizzes on operating systems, DBMS, networks and OOP, graded on the server with an explanation for every question. The answer options are shuffled every time. Your accuracy shows per topic and feeds the dashboard's readiness.</li>
   <li><b>Revision:</b> every quiz miss becomes a flashcard automatically; you can also turn concepts your interview reports flagged into cards, or write your own. Cards follow spaced repetition (SM-2): grade yourself Again, Hard, Good or Easy and each card comes back when you're about to forget it.</li>
-  <li><b>Study planner:</b> <b>Plan my week</b> fills the next 7 days within your daily study time (and before your deadline) from what the platform measured: your weakest report areas, unfinished problems, weakest patterns, quiz accuracy, due cards and rounds you haven't tried. Each task says why it's there. Add your own tasks, tick them off (+10 XP each, up to 30 a day) or delete them.</li>
-  <li><b>System design lab:</b> the interview frameworks for high-level and low-level design, and 12 case studies (URL shortener to ride matching; parking lot to ticket booking). Try each one first, then reveal the reference sections one at a time. <b>Practise this with Nisha</b> starts a design round focused on that case.</li>
+  <li><b>Study planner:</b> <b>Plan my week</b> fills the next 7 days within your daily study time (and before your deadline) from what the platform measured: your weakest report areas, unfinished problems, weakest patterns, quiz accuracy, due cards and rounds you haven't tried. Each task says why it's there. Add your own tasks, tick them off or delete them. Tasks the platform created (from reports and the planner) earn +10 XP each, up to 30 a day; tasks you add yourself are for your own tracking and earn no XP.</li>
+  <li><b>System design lab:</b> the interview frameworks for high-level and low-level design, and 12 case studies (URL shortener to ride matching; parking lot to ticket booking). Sketch your own design first on the built-in sketchpad (pen, boxes, eraser; saved on your device, downloadable as a PNG), then reveal the reference sections one at a time — including a reference architecture or class diagram. <b>Practise this with Nisha</b> starts a design round focused on that case.</li>
   <li><b>Project deep-dive:</b> add your projects (resume projects appear automatically). With a public GitHub link, <b>Analyse repository</b> reads the repo's metadata, file list, README and up to two dependency files — the page lists exactly what was read — and produces a summary, likely interview questions and claims to be ready to back up. <b>Practise a deep dive</b> starts a round with Rohan focused on that project.</li>
 </ul>
 
@@ -230,7 +233,7 @@
 </ul>
 
 <h2>14. Coming next</h2>
-<p>Every module in the sidebar is live. Ideas under consideration: more problems and quiz questions, linked-list problems with cycles, and system design diagrams you can draw in the browser.</p>
+<p>Every module in the sidebar is live. Ideas under consideration: comparing resume versions, email reminders, an interactive system design simulator, and smarter next-problem picks from your solve history.</p>
 
 <h2>15. Tips for getting the most out of it</h2>
 <ol>

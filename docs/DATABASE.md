@@ -31,3 +31,12 @@ Static content (problems, lessons, quizzes) is referenced by `slug` and lives in
 - `mock_interviews.topic` (≤200 chars, e.g. a system design case) and `project_id` (FK → projects, on delete set null); both insertable by the user.
 - `projects`: users may update only `title`, `description`, `technologies`, `repo_url`; `repo_snapshot` and `analysis` are written by the server.
 
+## 0007 — Task source
+- `study_tasks.source` (`user` | `report` | `planner` | …). Only non-`user` tasks earn XP, so typing your own tasks can't farm points. `public_profile` updated to match.
+
+## 0008 — Ping
+- `ping()` — `security definer`, returns `1` without reading user data. Used by `/api/health?db=1` and the keep-alive GitHub Action.
+
+## 0009 — Server-only transcripts
+- `insert/update/delete` on `interview_turns` revoked from `authenticated`; turns are written by the service role in the turn route, scoped by `user_id`. Users can still read their own turns (RLS).
+- `interview_events` gains the `nudge` event type (used to enforce the 2-minute nudge gap).
