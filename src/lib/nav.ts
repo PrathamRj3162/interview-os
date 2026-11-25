@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, FileText, Code2, BookOpen, Network, FolderGit2, Mic, CalendarCheck,
-  BarChart3, Layers, Settings, type LucideIcon,
+  Trophy, Layers, Settings, type LucideIcon,
 } from "lucide-react";
 
 /**
@@ -18,7 +18,7 @@ export const NAV: NavItem[] = [
   { href: "/projects", label: "Project deep-dive", icon: FolderGit2, available: false, phase: 6 },
   { href: "/interview", label: "Mock interviews", icon: Mic, available: true },
   { href: "/planner", label: "Study planner", icon: CalendarCheck, available: false, phase: 8 },
-  { href: "/analytics", label: "Analytics", icon: BarChart3, available: false, phase: 8 },
+  { href: "/progress", label: "Progress & XP", icon: Trophy, available: true },
   { href: "/revision", label: "Revision", icon: Layers, available: false, phase: 8 },
   { href: "/settings", label: "Settings", icon: Settings, available: true },
 ];

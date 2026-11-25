@@ -129,6 +129,16 @@ body {
   background-image: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.035) 0 1px, transparent 1px 3px);
 }
 
+/* Celebration confetti (progress page). Disabled by the reduced-motion rule below. */
+.confetti span {
+  position: absolute; top: -10px; width: 6px; height: 10px; border-radius: 1px; opacity: 0;
+  animation: confetti-fall 1.6s ease-in forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0); opacity: 1; }
+  100% { transform: translateY(70px) rotate(320deg); opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

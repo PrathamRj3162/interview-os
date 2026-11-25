@@ -102,6 +102,18 @@ test("DSA round: code, run, hint, submit, report", async ({ page }) => {
   await expect(page.getByTestId("annotated-code")).not.toContainText("Fabricated note");
   await expect(page.getByText(/1 note\(s\) didn't match your code and were discarded/)).toBeVisible();
   await expect(page.getByText(/Practise next/)).toBeVisible();
+
+  // Progress: the accepted problem earned XP and the first achievement; the dashboard shows the rank.
+  await page.goto("/progress");
+  await expect(page.getByTestId("rank-card")).toContainText(/Intern III/);
+  await expect(page.getByTestId("rank-card")).toContainText(/[1-9]\d* \/ 150 XP/);
+  const judge = page.getByRole("listitem").filter({ hasText: "Hello, Judge" });
+  await expect(judge).toContainText("Earned");
+  await expect(page.getByText(/Solved two-sum/)).toBeVisible();
+  await page.goto("/progress/notebook");
+  await expect(page.getByRole("heading", { name: "Mistake notebook" })).toBeVisible();
+  await page.goto("/dashboard");
+  await expect(page.getByTestId("dashboard-rank")).toContainText("Level 0");
 });
 
 test("DSA round: Python runs in the browser (Pyodide); C++ runs on the judge; mock mode has no hints", async ({ page }) => {

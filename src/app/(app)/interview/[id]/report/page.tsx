@@ -12,6 +12,7 @@ import { toView, type ViewReport, type ViewCategory } from "@/lib/interview/repo
 import { fmtClock, type CodeNote, type NoteKind } from "@/lib/interview/metrics";
 import type { Level } from "@/lib/interview/verdict";
 import { cn } from "@/lib/utils";
+import { DIFF_MULT } from "@/lib/progress/xp";
 
 export const metadata: Metadata = { title: "Interview report" };
 
@@ -49,6 +50,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   const prev = previous?.[0] as { id: string; overall_score: number | null; version: string | null } | undefined;
   const sameScale = prev && String(prev.version ?? "1") === String(r.version);
   const delta = sameScale && prev?.overall_score != null && r.overall != null ? Math.round(r.overall - Number(prev.overall_score)) : null;
+  const xpEarned = r.overall != null && r.communication.answers >= 3 ? Math.round(r.overall * (DIFF_MULT[iv.difficulty] ?? 1)) : 0;
   const again = `/interview/new?kind=${iv.kind}${iv.resume_id ? `&resume=${iv.resume_id}` : ""}${r.dsa ? `&problem=${r.dsa.problem.slug}` : ""}`;
 
   return (
@@ -59,6 +61,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{KINDS[iv.kind]?.name}{r.dsa ? ` · ${r.dsa.problem.title}` : ""} — report</h1>
           <p className="text-sm text-muted">
             {PERSONAS[iv.persona]?.name} · {iv.difficulty} · {iv.mode} · {new Date(iv.started_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}
+            {xpEarned > 0 && <> · <Link href="/progress" className="text-success underline-offset-2 hover:underline">+{xpEarned} XP</Link></>}
           </p>
         </div>
         <Link href={again} className={buttonClasses("primary", "sm")}>{r.dsa ? "Retry this problem" : "Practise this round again"}</Link>

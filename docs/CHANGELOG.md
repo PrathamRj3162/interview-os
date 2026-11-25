@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-11-25 · Progress, tiers and achievements
+- XP computed on the fly from recorded activity (no stored, editable XP number), `lib/progress/xp.ts`: interview = score × difficulty multiplier (needs 3+ answers); problems Easy 20 / Medium 40 / Hard 80 on the first accepted solve, ×0.5 with 2+ hints, +10 for a first-try accept; tasks +10 (max 30/day); streak +5 × min(streak, 10) per active day. Days use IST.
+- Levels at 150·k^1.6 XP; 7 tiers (Intern → Junior → SDE-1 → SDE-2 → Senior → Staff → Principal) × divisions III–I, with original hexagon emblems and taglines (Gen-Z or neutral, following the Vibe setting).
+- Decay: −1%/day after 7 inactive days, never below the tier floor; shown honestly with the amount.
+- 18 achievements with the date each was earned and progress bars for locked ones; personal bests (best score per round, fastest solve per difficulty, longest streak, best day); weekly recap vs the previous week; 30-day XP chart; recent XP ledger with the reason for every point.
+- Mistake notebook: concepts missed across reports (counted), every important mistake linked to its report, and problems attempted but not yet solved (with Retry).
+- Dashboard rank strip; report header shows the XP an interview earned; one-time level/rank/achievement celebration on the progress page (respects reduced motion).
+
 ## 0.5.0 — 2026-11-25 · Report v2: evidence-based verdict
 - Anchored 1–4 rubric: every category of every round has written meanings for 1, 2, 3 and 4 (`lib/interview/rubric.ts`); the report shows what your score means and what each level requires. Core categories per round count double.
 - Deterministic verdict (`lib/interview/verdict.ts`): weighted mean → No Hire / Lean No / Lean Hire / Hire / Strong Hire at fixed thresholds, then caps that only lower it (a 1 in a core category, any 1, failing or too-slow code, unverified code, 2–3 hints). Every step is shown. Too little evidence (under 3 answers, under half the categories scored, no core category) gives no verdict instead of a guess. The AI never picks the verdict.

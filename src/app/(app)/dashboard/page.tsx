@@ -14,6 +14,8 @@ import { ROLES, LANGUAGES, COMPANY_TRACKS } from "@/lib/validation/profile";
 import { KINDS, type KindId } from "@/lib/interview/config";
 import { getPrefs } from "@/lib/prefs";
 import { copy } from "@/lib/copy";
+import { loadProgress } from "@/lib/progress/server";
+import { Emblem, TIER_COLOR } from "@/components/progress/emblem";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -37,7 +39,9 @@ function Metric({ label, value, empty }: { label: string; value: number | null; 
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
-  const [profile, { vibe }] = await Promise.all([getProfile(supabase, user.id), getPrefs()]);
+  const [profile, { vibe }, prog] = await Promise.all([getProfile(supabase, user.id), getPrefs(), loadProgress(supabase)]);
+  const p = prog.progress;
+  const levelPct = Math.round(((p.xp - p.levelStart) / Math.max(1, p.nextLevelAt - p.levelStart)) * 100);
   if (!profile?.onboarded_at) redirect("/onboarding");
 
   const d = new Date();
@@ -93,6 +97,21 @@ export default async function DashboardPage() {
           {COMPANY_TRACKS[profile.company_track as keyof typeof COMPANY_TRACKS] ?? ""}
         </p>
       </div>
+
+      <Link href="/progress" className="block rounded-[var(--radius-lg)] focus-visible:outline-none" data-testid="dashboard-rank">
+        <Card className="flex flex-wrap items-center gap-4 transition-colors hover:border-accent/60">
+          <Emblem rank={p.rank} size={56} />
+          <div className="min-w-0 flex-1">
+            <p className="flex flex-wrap items-baseline gap-x-2"><span className="font-semibold" style={{ color: TIER_COLOR[p.rank.tier.id] }}>{p.rank.label}</span><span className="text-sm text-muted">Level {p.level} · {p.xp.toLocaleString("en-IN")} XP</span></p>
+            <div className="mt-2 h-1.5 max-w-md rounded-full bg-surface-2" aria-hidden><div className="h-1.5 rounded-full bg-accent" style={{ width: `${levelPct}%` }} /></div>
+            <p className="mt-1 text-xs text-muted">{vibe === "genz" ? p.rank.tier.tagline : p.rank.tier.pro}</p>
+          </div>
+          <div className="text-right text-sm">
+            <p className="font-mono tabular-nums">🔥 {p.streak.current} day{p.streak.current === 1 ? "" : "s"}</p>
+            <p className="text-xs text-muted">{prog.achievements.filter((a) => a.earnedAt).length} achievements</p>
+          </div>
+        </Card>
+      </Link>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card className="flex items-start gap-3">

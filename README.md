@@ -25,7 +25,8 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | Dashboard: today's tasks from report drills, data-driven next step | ✅ |
 | **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 79 problems (incl. linked lists and trees) with hidden tests and timed worst-case stress tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
 | Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
-| Tiers/XP/achievements, voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
+| **Progress & XP**: XP from interviews, solves, tasks and streaks (published formula), levels, 7 tiers × 3 divisions, decay with a tier floor, 18 dated achievements, personal bests, weekly recap, 30-day XP chart, mistake notebook | ✅ |
+| Voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
 
 ## Tech stack
 

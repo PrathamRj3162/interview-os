@@ -15,6 +15,9 @@ const PROTECTED_PREFIXES = [
   "/planner",
   "/analytics",
   "/revision",
+  "/progress",
+  "/companies",
+  "/mic-check",
 ];
 const AUTH_PAGES = ["/login", "/signup"];
 
