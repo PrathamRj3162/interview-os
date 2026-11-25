@@ -119,6 +119,11 @@ body {
   background: rgb(167 139 250 / 0.35);
 }
 
+/* Interview focus mode hides app chrome. */
+[data-focus-mode] [data-app-chrome] {
+  display: none;
+}
+
 /* Low-opacity scanlines + grain for hero sections only. */
 .scanlines {
   background-image: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.035) 0 1px, transparent 1px 3px);

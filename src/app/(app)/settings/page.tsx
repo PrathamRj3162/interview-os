@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import { Card } from "@/components/ui/card";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { AiConsentForm, DeleteAccountForm } from "@/components/profile/privacy-forms";
+import { AppearanceForm } from "@/components/profile/appearance-form";
+import { getPrefs } from "@/lib/prefs";
 import { requireUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profile-data";
 
@@ -10,7 +12,7 @@ export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
   const { supabase, user } = await requireUser();
-  const profile = await getProfile(supabase, user.id);
+  const [profile, prefs] = await Promise.all([getProfile(supabase, user.id), getPrefs()]);
   if (!profile?.onboarded_at) redirect("/onboarding");
   return (
     <div className="space-y-10">
@@ -18,6 +20,10 @@ export default async function SettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Settings</h1>
         <p className="mt-1 text-muted">Signed in as {user.email}</p>
       </div>
+      <section aria-labelledby="appearance-h">
+        <h2 id="appearance-h" className="mb-4 text-lg font-medium">Appearance</h2>
+        <Card><AppearanceForm theme={prefs.theme} vibe={prefs.vibe} /></Card>
+      </section>
       <section aria-labelledby="profile-h">
         <h2 id="profile-h" className="mb-4 text-lg font-medium">Preparation profile</h2>
         <ProfileForm mode="settings" defaults={profile} />

@@ -12,6 +12,8 @@ import { aiStatus } from "@/lib/ai";
 import { remainingQuota } from "@/lib/ai/quota";
 import { ROLES, LANGUAGES, COMPANY_TRACKS } from "@/lib/validation/profile";
 import { KINDS, type KindId } from "@/lib/interview/config";
+import { getPrefs } from "@/lib/prefs";
+import { copy } from "@/lib/copy";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
@@ -35,7 +37,7 @@ function Metric({ label, value, empty }: { label: string; value: number | null; 
 
 export default async function DashboardPage() {
   const { supabase, user } = await requireUser();
-  const profile = await getProfile(supabase, user.id);
+  const [profile, { vibe }] = await Promise.all([getProfile(supabase, user.id), getPrefs()]);
   if (!profile?.onboarded_at) redirect("/onboarding");
 
   const d = new Date();
@@ -85,7 +87,7 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Hi {firstName}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">{copy(vibe, "dashboardGreeting", { name: firstName })}</h1>
         <p className="mt-1 text-muted">
           Preparing for {ROLES[profile.target_role as keyof typeof ROLES] ?? "an SDE role"} ·{" "}
           {COMPANY_TRACKS[profile.company_track as keyof typeof COMPANY_TRACKS] ?? ""}
@@ -132,7 +134,7 @@ export default async function DashboardPage() {
             <span className="text-xs text-muted">From your interview feedback</span>
           </div>
           {tasks.length === 0 ? (
-            <p className="mt-3 text-sm text-muted">No tasks yet. Completing a mock interview adds tasks targeted at the weaknesses it found.</p>
+            <p className="mt-3 text-sm text-muted">{copy(vibe, "noTasks")}</p>
           ) : (
             <ul className="mt-3 divide-y divide-border">
               {tasks.map((t) => (

@@ -4,11 +4,14 @@ import { FileText } from "lucide-react";
 import { Card, Badge } from "@/components/ui/card";
 import { UploadForm } from "@/components/resume/upload-form";
 import { requireUser } from "@/lib/supabase/server";
+import { getPrefs } from "@/lib/prefs";
+import { copy } from "@/lib/copy";
 
 export const metadata: Metadata = { title: "Resume intelligence" };
 
 export default async function ResumePage() {
   const { supabase } = await requireUser();
+  const { vibe } = await getPrefs();
   const { data: resumes } = await supabase
     .from("resumes")
     .select("id, file_name, created_at, is_active, resume_analyses(overall_score, ai_findings, created_at)")
@@ -38,7 +41,7 @@ export default async function ResumePage() {
       <section aria-labelledby="history-h">
         <h2 id="history-h" className="mb-3 font-medium">Your resumes</h2>
         {!resumes?.length ? (
-          <Card className="text-center text-sm text-muted">No resumes uploaded yet.</Card>
+          <Card className="text-center text-sm text-muted">{copy(vibe, "noResumes")}</Card>
         ) : (
           <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
             {resumes.map((r) => {

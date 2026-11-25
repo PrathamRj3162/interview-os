@@ -16,7 +16,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const name = profile.full_name || user.email || "Account";
   return (
     <div className="flex min-h-dvh">
-      <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface p-4 lg:flex">
+      <aside data-app-chrome className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-border bg-surface/60 p-4 lg:flex">
         <div className="mb-6 px-2"><Logo href="/dashboard" /></div>
         <nav aria-label="Main" className="flex-1 overflow-y-auto"><NavLinks /></nav>
         <div className="border-t border-border pt-3">
@@ -30,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-surface/90 px-4 py-2 backdrop-blur lg:hidden">
+        <header data-app-chrome className="sticky top-0 z-40 flex items-center justify-between border-b border-border bg-bg/85 px-4 py-2 backdrop-blur-md lg:hidden">
           <MobileNav />
           <Logo href="/dashboard" />
           <form action={signOut}>

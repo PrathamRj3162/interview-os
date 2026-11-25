@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, Volume2, VolumeX, Pause, Play, Square, Send, Lightbulb, RotateCcw, Code2, Loader2 } from "lucide-react";
+import { Mic, MicOff, Volume2, VolumeX, Pause, Play, Square, Send, Lightbulb, RotateCcw, Code2, Loader2, Keyboard, Maximize2, Minimize2 } from "lucide-react";
+import { Dialog } from "@/components/ui/interactive";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -41,6 +42,8 @@ export function InterviewRoom(p: RoomProps) {
   const [ending, setEnding] = useState<null | "evaluating" | "failed" | "abandoned">(null);
   const [endMsg, setEndMsg] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [focusMode, setFocusMode] = useState(false);
+  const [showKeys, setShowKeys] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const spokenRef = useRef<number>(p.initialTurns.at(-1)?.id ?? 0);
 
@@ -118,6 +121,8 @@ export function InterviewRoom(p: RoomProps) {
     if (!paused) { mic.stop(); tts.cancel(); }
     setPaused(!paused);
   };
+  const togglePauseRef = useRef(togglePause);
+  useEffect(() => { togglePauseRef.current = togglePause; });
 
   const end = async () => {
     mic.stop(); tts.cancel(); setConfirmEnd(false); setEnding("evaluating"); setEndMsg(null);
@@ -133,6 +138,27 @@ export function InterviewRoom(p: RoomProps) {
     }
     setEnding("failed"); setEndMsg("The report is taking longer than expected. Refresh this page in a minute.");
   };
+
+  // Global shortcuts: Space (hold) = push-to-talk when not typing, Esc = pause/resume, ? = cheat-sheet.
+  const pttRef = useRef(false);
+  useEffect(() => {
+    const typing = (el: EventTarget | null) => el instanceof HTMLElement && (el.tagName === "TEXTAREA" || el.tagName === "INPUT" || el.tagName === "SELECT" || el.isContentEditable);
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !showKeys) { e.preventDefault(); togglePauseRef.current(); return; }
+      if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "?") { e.preventDefault(); setShowKeys(true); }
+      if (e.code === "Space" && !e.repeat && mic.supported && !paused) { e.preventDefault(); pttRef.current = true; mic.start(); }
+    };
+    const up = (e: KeyboardEvent) => { if (e.code === "Space" && pttRef.current) { pttRef.current = false; mic.stop(); } };
+    window.addEventListener("keydown", down); window.addEventListener("keyup", up);
+    return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); };
+  }, [mic, paused, showKeys]);
+
+  // Focus mode hides the app chrome (sidebar/header) for a distraction-free room.
+  useEffect(() => {
+    document.documentElement.toggleAttribute("data-focus-mode", focusMode);
+    return () => document.documentElement.removeAttribute("data-focus-mode");
+  }, [focusMode]);
 
   // Ctrl/Cmd+Enter sends
   const onKey = (e: React.KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); void send(); } };
@@ -158,7 +184,15 @@ export function InterviewRoom(p: RoomProps) {
           <h1 className="truncate font-semibold">{p.title}</h1>
           <p className="truncate text-xs text-muted">{p.personaName} · {p.mode === "mock" ? "Mock interview (no hints)" : "Practice mode"}</p>
         </div>
-        <span className={cn("font-mono text-sm tabular-nums", remaining < 0 ? "text-danger" : remaining < 120 ? "text-warning" : "text-muted")} aria-label="Time remaining">{fmt(remaining)}</span>
+        <span className={cn("font-mono text-lg font-medium tabular-nums", remaining < 0 ? "text-danger" : remaining < 120 ? "text-warning" : "text-text")} aria-label="Time remaining">{fmt(remaining)}</span>
+        <span className={cn("flex items-center gap-1.5 text-xs", mic.state === "listening" ? "text-success" : mic.state === "denied" || mic.state === "error" ? "text-danger" : "text-muted")}>
+          {mic.state === "listening" ? <Mic className="size-3.5" aria-hidden /> : <MicOff className="size-3.5" aria-hidden />}
+          {mic.state === "listening" ? "Mic live" : mic.state === "denied" ? "Mic blocked" : mic.state === "unsupported" ? "No mic support" : "Mic off"}
+        </span>
+        <Button size="sm" variant="ghost" onClick={() => setShowKeys(true)} aria-label="Keyboard shortcuts"><Keyboard className="size-4" aria-hidden /></Button>
+        <Button size="sm" variant="ghost" onClick={() => setFocusMode(!focusMode)} aria-pressed={focusMode} aria-label={focusMode ? "Exit focus mode" : "Focus mode"}>
+          {focusMode ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
+        </Button>
         <Badge tone={net === "error" ? "warning" : mic.state === "listening" ? "success" : "accent"} aria-live="polite">
           {(net === "thinking" || tts.speaking || mic.state === "listening") && <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-current" aria-hidden />}
           {status}
@@ -189,7 +223,7 @@ export function InterviewRoom(p: RoomProps) {
         {showCode && (
           <section aria-label="Code editor" className="flex min-h-48 flex-col rounded-xl border border-border bg-surface">
             <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted">
-              <span>Editor — sent with your next answer</span>
+              <span className="flex items-center gap-1 font-mono">editor<span aria-hidden className="inline-block h-3.5 w-[7px] animate-[var(--animate-caret)] bg-accent" /><span className="ml-2 font-sans">sent with your next answer</span></span>
               <span>{code.split("\n").length} lines</span>
             </div>
             <textarea
@@ -268,6 +302,13 @@ export function InterviewRoom(p: RoomProps) {
           <p className="mt-2 text-[11px] text-muted">Turn-based voice using your browser&apos;s speech recognition and text-to-speech — not a real-time voice model. InterviewOS stores only the text transcript, never audio.</p>
         )}
       </div>
+      <Dialog open={showKeys} onClose={() => setShowKeys(false)} title="Keyboard shortcuts">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
+          {[["Hold Space", "Push-to-talk (when not typing)"], ["Ctrl/⌘ + Enter", "Send your answer"], ["Esc", "Pause / resume"], ["?", "Show this sheet"], ["Tab (in editor)", "Insert two spaces"]].map(([k, d]) => (
+            <div key={k} className="contents"><dt><kbd className="rounded border border-border-strong bg-surface-2 px-1.5 py-0.5 font-mono text-xs">{k}</kbd></dt><dd className="text-muted">{d}</dd></div>
+          ))}
+        </dl>
+      </Dialog>
     </div>
   );
 }

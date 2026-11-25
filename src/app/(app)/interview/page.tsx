@@ -5,6 +5,8 @@ import { Card, Badge } from "@/components/ui/card";
 import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/supabase/server";
 import { KINDS, PERSONAS, type KindId, type PersonaId } from "@/lib/interview/config";
+import { getPrefs } from "@/lib/prefs";
+import { copy } from "@/lib/copy";
 
 export const metadata: Metadata = { title: "Mock interviews" };
 
@@ -18,6 +20,7 @@ const statusLabel: Record<string, { label: string; tone: "neutral" | "accent" | 
 
 export default async function InterviewsPage() {
   const { supabase } = await requireUser();
+  const { vibe } = await getPrefs();
   const { data: rows } = await supabase
     .from("mock_interviews")
     .select("id, kind, persona, difficulty, mode, status, overall_score, started_at")
@@ -53,9 +56,9 @@ export default async function InterviewsPage() {
       {!rows?.length ? (
         <Card className="flex flex-col items-center gap-3 py-10 text-center">
           <Mic className="size-6 text-accent" aria-hidden />
-          <p className="font-medium">No interviews yet</p>
+          <p className="font-medium">{copy(vibe, "noInterviews")}</p>
           <p className="max-w-md text-sm text-muted">Start with a resume-based interview — the interviewer will cross-question the claims on your resume.</p>
-          <Link href="/interview/new" className={buttonClasses("primary", "sm")}>Start your first interview</Link>
+          <Link href="/interview/new" className={buttonClasses("primary", "sm")}>{copy(vibe, "interviewEmptyCta")}</Link>
         </Card>
       ) : (
         <ul className="divide-y divide-border rounded-xl border border-border bg-surface">
