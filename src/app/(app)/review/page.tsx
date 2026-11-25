@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, XCircle } from "lucide-react";
 import { Card, Badge } from "@/components/ui/card";
 import { createAdminClient, requireUser } from "@/lib/supabase/server";
-import { isAdminEmail, loadGate } from "@/lib/content/gate";
+import { isAdminUser, loadGate } from "@/lib/content/gate";
 import { allContent } from "@/lib/content/registry";
 import { ReviewControls } from "@/components/content/review-controls";
 
@@ -13,7 +13,7 @@ export const metadata: Metadata = { title: "Content review", robots: { index: fa
 /** Admin-only review gate: every content item, its automated checks, open reports and a status switch. */
 export default async function ReviewPage({ searchParams }: { searchParams: Promise<{ filter?: string }> }) {
   const { user } = await requireUser();
-  if (!isAdminEmail(user.email)) notFound();
+  if (!isAdminUser(user)) notFound();
   const { filter = "attention" } = await searchParams;
   const gate = await loadGate();
   const { data: reports } = await createAdminClient().from("content_reports").select("item_id, version, reason, note, created_at").is("resolved_at", null).order("created_at", { ascending: false }).limit(500);
@@ -30,7 +30,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Content review</h1>
-        <p className="text-sm text-muted">Only <b>live</b> items are shown to users. <b>Reviewed</b> items are visible to admins as a preview. Items with failing checks can&apos;t go live. Editing an item bumps its version, which needs review again.</p>
+        <p className="text-sm text-muted">Only <b>live</b> items are shown to users. Admins can open every item; anything not live is marked <b>Preview</b>. Items with failing checks can&apos;t go live. Editing an item bumps its version, which needs review again.</p>
         <p className="mt-2 flex flex-wrap gap-2 text-sm">
           <Badge>{counts.draft} draft</Badge><Badge>{counts.reviewed} reviewed</Badge><Badge>{counts.live} live</Badge>
           <Link href="/review?filter=attention" className={filter !== "all" ? "font-medium text-accent" : "text-muted"}>Needs attention</Link>

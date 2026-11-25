@@ -10,11 +10,16 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return list.includes(email.toLowerCase());
 }
 
+/** Admin = a listed email that has been confirmed (signing up with someone else's address grants nothing). */
+export function isAdminUser(user: { email?: string | null; email_confirmed_at?: string | null } | null | undefined): boolean {
+  return Boolean(user?.email_confirmed_at) && isAdminEmail(user?.email);
+}
+
 export type Gate = {
   isAdmin: boolean;
   statusOf: (m: ContentMeta) => ContentStatus;
   hidden: (m: ContentMeta) => boolean;
-  /** Users: live and not hidden by reports. Admins: also reviewed items (preview). */
+  /** Users: live and not hidden by reports. Admins: everything (non-live items are marked Preview). */
   visible: (m: ContentMeta) => boolean;
   /** True when an admin is seeing an item ordinary users can't. */
   preview: (m: ContentMeta) => boolean;
@@ -29,7 +34,7 @@ export function makeGate(reviews: { item_id: string; version: number; status: st
   const userVisible = (m: ContentMeta) => statusOf(m) === "live" && !hidden(m);
   return {
     isAdmin, statusOf, hidden,
-    visible: (m) => userVisible(m) || (isAdmin && statusOf(m) !== "draft"),
+    visible: (m) => userVisible(m) || isAdmin,
     preview: (m) => isAdmin && !userVisible(m),
   };
 }
@@ -42,5 +47,7 @@ export const loadGate = cache(async (): Promise<Gate> => {
     supabase.from("content_reviews").select("item_id, version, status"),
     supabase.rpc("content_hidden_items"),
   ]);
-  return makeGate(rv.data ?? [], (hd.data as { item_id: string; version: number }[] | null) ?? [], isAdminEmail(user.email));
+  // On a query error, fall back to shipped statuses (drafts stay hidden) and say so in the logs.
+  if (rv.error || hd.error) console.error("[content-gate]", rv.error?.message ?? "", hd.error?.message ?? "");
+  return makeGate(rv.data ?? [], (hd.data as { item_id: string; version: number }[] | null) ?? [], isAdminUser(user));
 });

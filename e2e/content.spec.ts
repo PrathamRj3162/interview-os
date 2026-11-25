@@ -5,8 +5,8 @@ import { E2E_ADMIN_EMAIL } from "../playwright.config";
 
 /**
  * Content review gate on a fixture case that only exists on the local E2E server (E2E_FIXTURES=1), so real
- * content is never touched: draft → hidden; reviewed → admin preview only; live → everyone; 3 reports → hidden;
- * resolve → back. Users can't write reviews themselves.
+ * content is never touched: draft/reviewed → admin preview only; live → everyone; reports reach /review, and
+ * brand-new accounts can't auto-hide an item. Users can't write reviews themselves.
  */
 const stamp = Date.now();
 const PW = `Content-pass-${stamp}`;
@@ -16,6 +16,8 @@ const ID = "design-case:e2e-fixture";
 const URL = "/system-design/e2e-fixture";
 
 test.describe.configure({ mode: "serial" });
+// Needs the local server Playwright starts (E2E_FIXTURES=1, ADMIN_EMAILS); never runs against a deployment.
+test.skip(!!process.env.E2E_BASE_URL, "local test server only");
 test.setTimeout(3 * 60_000);
 
 const cleanup = async () => {
@@ -56,6 +58,8 @@ test("review gate: draft hidden, reviewed is admin preview, live for everyone", 
   expect(forged.error?.code).toBe("42501");
 
   await login(page, ADMIN);
+  await page.goto(URL); // admins can read a draft before approving it
+  await expect(page.getByText("Preview — not live")).toBeVisible();
   await page.goto("/review");
   await expect(status(page)).toHaveText("draft");
   await page.getByTestId("review-item").filter({ hasText: "E2E fixture case" }).getByRole("button", { name: "Mark reviewed" }).click();
@@ -79,7 +83,7 @@ test("review gate: draft hidden, reviewed is admin preview, live for everyone", 
   await expect(page.getByText("Preview — not live")).toHaveCount(0);
 });
 
-test("three reports hide an item until an admin resolves them", async ({ page }) => {
+test("reports reach the admin; brand-new accounts can't hide an item", async ({ page }) => {
   for (const u of USERS) {
     await login(page, u);
     await page.goto(URL);
@@ -88,17 +92,16 @@ test("three reports hide an item until an admin resolves them", async ({ page })
     await page.getByRole("button", { name: "Send report" }).click();
     await expect(page.getByText(/Thanks — reported/)).toBeVisible();
   }
+  // Only confirmed accounts at least 7 days old count toward auto-hiding (migration 0012), so throwaway
+  // accounts can't take content down: the case stays visible.
   await login(page, USERS[0]);
-  await expectNotFound(page, URL);
+  await expectCase(page);
 
   await login(page, ADMIN);
   await page.goto("/review");
   const row = page.getByTestId("review-item").filter({ hasText: "E2E fixture case" });
-  await expect(row.getByText("hidden by reports")).toBeVisible();
   await expect(row.getByText("3 open reports")).toBeVisible();
-  await row.getByRole("button", { name: "Resolve reports" }).click();
   await expect(row.getByText("hidden by reports")).toHaveCount(0);
-
-  await login(page, USERS[1]);
-  await expectCase(page);
+  await row.getByRole("button", { name: "Resolve reports" }).click();
+  await expect(row).toHaveCount(0); // live, passing checks, no open reports → no longer needs attention
 });

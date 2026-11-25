@@ -16,7 +16,7 @@ export function ReviewControls({ itemId, version, status, canGoLive, hasReports 
       {status !== "draft" && <Button size="sm" variant="ghost" disabled={pending} onClick={() => set("draft")}>Back to draft</Button>}
       {status !== "reviewed" && <Button size="sm" variant="secondary" disabled={pending} onClick={() => set("reviewed")}>Mark reviewed</Button>}
       {status !== "live" && <Button size="sm" disabled={pending || !canGoLive} onClick={() => set("live")} title={canGoLive ? undefined : "Fix the failing checks first"}>Make live</Button>}
-      {hasReports && <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(async () => { await resolveReports({ itemId, version }); router.refresh(); })}>Resolve reports</Button>}
+      {hasReports && <Button size="sm" variant="ghost" disabled={pending} onClick={() => start(async () => { const r = await resolveReports({ itemId, version }); setErr(!r.ok); router.refresh(); })}>Resolve reports</Button>}
       {err && <span role="status" className="text-xs text-danger">Couldn&apos;t save.</span>}
     </div>
   );

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createAdminClient, getCurrentUser } from "@/lib/supabase/server";
-import { isAdminEmail } from "@/lib/content/gate";
+import { isAdminUser } from "@/lib/content/gate";
 import { CONTENT_BY_ID } from "@/lib/content/registry";
 import { REPORT_REASONS } from "@/lib/content/types";
 
@@ -17,7 +17,7 @@ export async function reportProblem(input: z.input<typeof reportSchema>): Promis
   const { supabase, user } = await getCurrentUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   const { itemId, version, reason, note } = parsed.data;
-  if (!CONTENT_BY_ID().has(itemId)) return { ok: false, message: "Unknown item." };
+  if (CONTENT_BY_ID().get(itemId)?.meta.version !== version) return { ok: false, message: "Unknown item." };
   const { error } = await supabase.from("content_reports").insert({ item_id: itemId, version, reason, note: note || null });
   if (error?.code === "23505") return { ok: true, message: "You've already reported this — thanks, it's in the queue." };
   return error ? { ok: false, message: "Couldn't send the report. Try again." } : { ok: true, message: "Thanks — reported. We'll check it." };
@@ -25,7 +25,7 @@ export async function reportProblem(input: z.input<typeof reportSchema>): Promis
 
 async function requireAdmin() {
   const { user } = await getCurrentUser();
-  return user && isAdminEmail(user.email) ? user : null;
+  return isAdminUser(user) ? user : null;
 }
 
 const statusSchema = z.object({ ...itemRef, status: z.enum(["draft", "reviewed", "live"]) });

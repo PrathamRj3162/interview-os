@@ -1,19 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { makeGate, isAdminEmail } from "@/lib/content/gate";
+import { makeGate, isAdminEmail, isAdminUser } from "@/lib/content/gate";
 import { allContent } from "@/lib/content/registry";
 import type { ContentMeta } from "@/lib/content/types";
 
 const item = (over: Partial<ContentMeta> = {}): ContentMeta => ({ id: "design-case:x", version: 1, type: "design-case", tags: [], status: "draft", ...over });
 
 describe("content gate", () => {
-  it("only live items are visible to users; admins also preview reviewed items, never drafts", () => {
+  it("only live items are visible to users; admins can open everything, non-live marked preview", () => {
     const g = makeGate([], [], false), a = makeGate([], [], true);
     expect(g.visible(item({ status: "live" }))).toBe(true);
     expect(g.visible(item({ status: "reviewed" }))).toBe(false);
     expect(a.visible(item({ status: "reviewed" }))).toBe(true);
     expect(a.preview(item({ status: "reviewed" }))).toBe(true);
-    expect(a.visible(item({ status: "draft" }))).toBe(false);
+    expect(a.visible(item({ status: "draft" }))).toBe(true);
+    expect(a.preview(item({ status: "draft" }))).toBe(true);
     expect(a.preview(item({ status: "live" }))).toBe(false);
   });
   it("a review overrides the shipped status only for the same version", () => {
@@ -26,6 +27,12 @@ describe("content gate", () => {
     expect(g.visible(item({ status: "live" }))).toBe(false);
     expect(g.hidden(item({ status: "live" }))).toBe(true);
     expect(g.visible(item({ status: "live", version: 2 }))).toBe(true);
+  });
+  it("an admin must have a confirmed email", () => {
+    vi.stubEnv("ADMIN_EMAILS", "a@x.com");
+    expect(isAdminUser({ email: "a@x.com", email_confirmed_at: "2026-01-01" })).toBe(true);
+    expect(isAdminUser({ email: "a@x.com", email_confirmed_at: null })).toBe(false);
+    vi.unstubAllEnvs();
   });
   it("admin emails come only from ADMIN_EMAILS, case-insensitive", () => {
     vi.stubEnv("ADMIN_EMAILS", " A@x.com ,b@y.com");

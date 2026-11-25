@@ -25,7 +25,8 @@ export function Sketchpad({ storageKey }: { storageKey: string }) {
     try { saved = localStorage.getItem(storageKey); } catch { /* blocked */ }
     if (!saved) return;
     const img = new Image();
-    img.onload = () => ctx()?.drawImage(img, 0, 0);
+    // Draw underneath anything already drawn, in case the user started before the saved sketch loaded.
+    img.onload = () => { const c = ctx(); if (!c) return; c.globalCompositeOperation = "destination-over"; c.drawImage(img, 0, 0); c.globalCompositeOperation = "source-over"; };
     img.src = saved;
   }, [storageKey]);
 
@@ -55,7 +56,14 @@ export function Sketchpad({ storageKey }: { storageKey: string }) {
   };
   const up = () => { if (!drawing.current) return; drawing.current = false; start.current = null; save(); };
   const clear = () => { ctx()?.clearRect(0, 0, W, H); try { localStorage.removeItem(storageKey); } catch { /* blocked */ } };
-  const download = () => { const a = document.createElement("a"); a.href = canvas.current!.toDataURL("image/png"); a.download = "my-design.png"; a.click(); };
+  // The canvas is transparent with theme-coloured strokes, so the PNG gets the page background behind it.
+  const download = () => {
+    const out = document.createElement("canvas"); out.width = W; out.height = H;
+    const o = out.getContext("2d")!;
+    o.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--bg").trim() || "#000";
+    o.fillRect(0, 0, W, H); o.drawImage(canvas.current!, 0, 0);
+    const a = document.createElement("a"); a.href = out.toDataURL("image/png"); a.download = "my-design.png"; a.click();
+  };
 
   const btn = (t: Tool, label: string, Icon: typeof Pencil) => (
     <button type="button" onClick={() => setTool(t)} aria-pressed={tool === t} className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm ${tool === t ? "border-accent bg-accent-soft" : "border-border hover:border-border-strong"}`}>
