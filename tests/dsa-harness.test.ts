@@ -95,18 +95,18 @@ describe("language harnesses (local toolchains)", () => {
     const bad = out.tests.filter((t) => t.verdict !== "pass");
     expect(bad, JSON.stringify(bad.slice(0, 2)) + ("compileOutput" in out ? out.compileOutput ?? "" : "")).toEqual([]);
     expect(out.status).toBe("accepted");
-  });
+  }, 30_000);
 
   it.each(PROBLEMS.map((p) => [p.slug]))("%s: starter code compiles in C++ (and fails tests, not the build)", (slug) => {
     if (!HAS.cpp) return;
     const out = judge("cpp", slug, starterCode(testsFor(slug)!.problem, "cpp"));
     expect(out.status).not.toBe("compile_error");
-  });
+  }, 30_000);
 
   it("Java starter code compiles for every signature", () => {
     if (!HAS.java) return;
     for (const p of PROBLEMS) expect(judge("java", p.slug, starterCode(p, "java")).status, p.slug).not.toBe("compile_error");
-  });
+  }, 180_000); // javac × 59 takes ~45 s on CI
 
   it("Python and JS starter code run (and simply fail)", () => {
     for (const lang of ["python", "javascript"] as const) {
