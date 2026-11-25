@@ -80,9 +80,13 @@ test("voice room: settings dialog, honest engine availability, settings persist"
   await expect(page).toHaveURL(/\/interview\/[0-9a-f-]{36}$/, { timeout: 20_000 });
   await expect(page.getByRole("region", { name: "Interview transcript" }).locator("li").first()).toBeVisible({ timeout: 30_000 });
 
+  // Turning the mic on starts the Silero model detector (loaded from the CDN), with energy as the fallback.
+  await page.getByRole("button", { name: "Start microphone" }).click();
   await page.getByRole("button", { name: "Voice settings" }).click();
   const dialog = page.getByRole("dialog", { name: "Voice settings" });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/Smart \(Silero model\)/)).toBeVisible();
+  await expect(dialog.getByText(/runs on your device\. Active\./)).toBeVisible({ timeout: 20_000 });
   await expect(dialog.getByLabel(/Browser voice/)).toBeChecked();
   const whisper = dialog.getByLabel(/Whisper \(server\)/);
   if (await whisper.isDisabled()) await expect(dialog.getByText(/Not configured on this deployment/)).toBeVisible();

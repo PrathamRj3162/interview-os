@@ -53,6 +53,14 @@ export function VoiceSettingsDialog({ open, onClose, voice }: { open: boolean; o
             <span className="font-medium">Pause that ends an answer: {(s.silenceMs / 1000).toFixed(1)} s</span>
             <input type="range" min={800} max={3000} step={100} value={s.silenceMs} onChange={(e) => voice.setSettings({ silenceMs: Number(e.target.value) })} className="mt-1 w-full accent-[var(--accent)]" aria-label="Pause length in milliseconds" />
           </label>
+          <Choice name="Pause detection" value={s.vad} onChange={(v) => voice.setSettings({ vad: v })} options={[
+            { value: "silero", label: "Smart (Silero model)", hint: `Recognises speech rather than loudness, so fans and background chatter don't cut you off. ~2 MB, runs on your device.${voice.vadEngine === "silero" ? " Active." : voice.vadEngine === "energy" && s.vad === "silero" ? " Couldn't load — using basic detection." : ""}` },
+            { value: "energy", label: "Basic (loudness)", hint: "No download. Works best in a quiet room." },
+          ]} />
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" checked={s.noisy} onChange={(e) => voice.setSettings({ noisy: e.target.checked })} className="mt-0.5 accent-[var(--accent)]" />
+            <span><span className="font-medium">Noisy room</span><span className="block text-xs text-muted">Needs clearer, longer speech before a turn starts — fewer false starts from background noise. Applies the next time the mic turns on.</span></span>
+          </label>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" checked={s.bargeIn} onChange={(e) => voice.setSettings({ bargeIn: e.target.checked })} className="mt-0.5 accent-[var(--accent)]" />
             <span><span className="font-medium">Interrupt the interviewer by speaking</span><span className="block text-xs text-muted">Works best with headphones, so the interviewer&apos;s voice isn&apos;t mistaken for yours.</span></span>

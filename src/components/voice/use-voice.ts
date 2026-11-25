@@ -6,6 +6,7 @@ import { createVad, rmsOf } from "@/lib/voice/vad";
 import { splitSentences } from "@/lib/voice/sentences";
 import { loadKokoro, synthKokoro } from "./kokoro";
 import { loadLocalWhisper, transcribeLocal } from "./whisper-local";
+import { startSilero } from "./silero";
 
 export type VoiceSettings = {
   /** browser = Web Speech API · local = Whisper on this device · whisper = Whisper on the server (Groq key needed). */
@@ -18,8 +19,12 @@ export type VoiceSettings = {
   /** Talking over the interviewer stops its voice. */
   bargeIn: boolean;
   deviceId: string | null;
+  /** Pause detection: Silero (model-based, falls back automatically) or loudness only. */
+  vad: "silero" | "energy";
+  /** Noisy room: needs clearer, longer speech before a turn starts. */
+  noisy: boolean;
 };
-export const DEFAULT_VOICE: VoiceSettings = { stt: "browser", tts: "browser", autoSend: true, silenceMs: 1400, bargeIn: true, deviceId: null };
+export const DEFAULT_VOICE: VoiceSettings = { stt: "browser", tts: "browser", autoSend: true, silenceMs: 1400, bargeIn: true, deviceId: null, vad: "silero", noisy: false };
 const KEY = "ios-voice-settings";
 const AUTO_SEND_MS = 1500;
 
@@ -76,7 +81,10 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
     setSttPct((p) => p ?? 0); // eslint-disable-line react-hooks/set-state-in-effect -- progress of a background download
     loadLocalWhisper((p) => setSttPct(p)).then(() => setSttPct(100)).catch(() => { setSttPct(null); setMicError("On-device speech recognition couldn't load (offline or blocked). Switch the listening engine in voice settings."); });
   }, [settings.stt]);
-  const media = useRef<{ stream: MediaStream; ctx: AudioContext; timer: number; rec: MediaRecorder | null } | null>(null);
+  type MediaState = { stream: MediaStream; ctx: AudioContext; timer: number; rec: MediaRecorder | null; silero?: { destroy(): void } | null };
+  const media = useRef<MediaState | null>(null);
+  /** Which detector is deciding turns right now (shown in voice settings). */
+  const [vadEngine, setVadEngine] = useState<"silero" | "energy" | null>(null);
   const vad = useRef(createVad());
   const autoTimer = useRef<number | null>(null);
   const ttsSpeaking = useRef(false);
@@ -132,6 +140,7 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
     if (m) {
       clearInterval(m.timer);
       if (m.rec && m.rec.state !== "inactive") { m.rec.onstop = null; m.rec.stop(); }
+      try { m.silero?.destroy(); } catch { /* already gone */ }
       m.stream.getTracks().forEach((t) => t.stop());
       void m.ctx.close().catch(() => {});
     }
@@ -173,29 +182,44 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
       an.fftSize = 1024;
       ctx.createMediaStreamSource(stream).connect(an);
       const buf = new Float32Array(an.fftSize);
-      vad.current = createVad({ endMs: s.silenceMs });
+      vad.current = createVad({ endMs: s.silenceMs, ...(s.noisy ? { startRatio: 4.5, minLevel: 0.025 } : {}) });
       let lastUi = 0;
-      const m = { stream, ctx, timer: 0, rec: null as MediaRecorder | null };
+      let loudNow = false; // energy detector's strict (barge-in) verdict, used to confirm Silero while the interviewer talks
+      const m: MediaState = { stream, ctx, timer: 0, rec: null, silero: null };
+      const onStart = () => {
+        setUserSpeaking(true);
+        cancelAutoSend();
+        if (ttsSpeaking.current && settingsRef.current.bargeIn) { stopTts.current(); if (!armed.current) arm(); } // barge-in
+      };
+      const onEnd = () => {
+        setUserSpeaking(false);
+        if (!armed.current) return;
+        vadEndAt.current = Date.now();
+        if (useWhisperRef.current) { if (m.rec && m.rec.state === "recording") m.rec.stop(); }
+        else scheduleAutoSend();
+      };
       m.timer = window.setInterval(() => {
         an.getFloatTimeDomainData(buf);
         const r = rmsOf(buf);
         const now = performance.now();
         const ev = vad.current.push(r, now, ttsSpeaking.current);
         if (now - lastUi > 80) { lastUi = now; setLevel(Math.min(1, r * 8)); }
-        if (ev === "start") {
-          setUserSpeaking(true);
-          cancelAutoSend();
-          if (ttsSpeaking.current && settingsRef.current.bargeIn) { stopTts.current(); if (!armed.current) arm(); } // barge-in
-        }
-        if (ev === "end") {
-          setUserSpeaking(false);
-          if (!armed.current) return;
-          vadEndAt.current = Date.now();
-          if (useWhisperRef.current) { if (m.rec && m.rec.state === "recording") m.rec.stop(); }
-          else scheduleAutoSend();
-        }
+        loudNow = vad.current.speaking;
+        if (m.silero) return; // Silero decides turns once it's running; energy stays for the meter and barge-in check
+        if (ev === "start") onStart();
+        if (ev === "end") onEnd();
       }, 30);
       media.current = m;
+      setVadEngine("energy");
+      if (s.vad === "silero") {
+        startSilero({
+          stream, silenceMs: s.silenceMs, noisy: s.noisy,
+          // While the interviewer talks, also require real loudness so speaker echo can't barge in.
+          onStart: () => { if (!ttsSpeaking.current || loudNow) onStart(); },
+          onEnd,
+        }).then((h) => { if (media.current === m) { m.silero = h; setVadEngine("silero"); } else h.destroy(); })
+          .catch(() => setVadEngine("energy")); // stays on the energy detector
+      }
       return true;
     } catch (e) {
       const name = e instanceof DOMException ? e.name : "";
@@ -382,6 +406,7 @@ export function useVoice(opts: { sttServer: boolean; onText: (text: string) => v
       supported: useWhisper ? true : sr.supported,
       level, userSpeaking, transcribing,
     },
+    vadEngine,
     tts: { speak, cancel, speaking, supported: ttsSupported, note: ttsNote, kokoroPct, beginSpeech, pushSpeech, endSpeech },
     sttPct,
     autoSendIn, cancelAutoSend,
