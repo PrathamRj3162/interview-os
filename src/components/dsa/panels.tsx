@@ -74,7 +74,7 @@ function Results({ ws }: { ws: DsaWorkspace }) {
   const o = ws.outcome;
   if (ws.busy) return <p role="status" className="flex items-center gap-2 p-3 text-sm text-muted"><Loader2 className="size-4 animate-spin" aria-hidden /> {ws.status}</p>;
   if (ws.error) return <p role="alert" className="p-3 text-sm text-warning">{ws.error}</p>;
-  if (!o) return <p className="p-3 text-sm text-muted">Run checks the examples ({ws.language === "python" || ws.language === "javascript" ? "in your browser" : "on the judge"}). Submit runs the hidden tests too.</p>;
+  if (!o) return <p className="p-3 text-sm text-muted">Run checks the examples ({ws.language === "python" || ws.language === "javascript" ? "in your browser" : "on the judge"}). Submit also runs the hidden tests{ws.problem.hasStress ? ", including a large worst-case input that catches slow solutions" : ""}.</p>;
   const meta = STATUS_META[o.status];
   const hidden = o.tests.filter((t) => t.hidden);
   return (
@@ -90,8 +90,9 @@ function Results({ ws }: { ws: DsaWorkspace }) {
       {o.tests.filter((t) => !t.hidden || t.input).map((t) => (
         <details key={t.index} open={t.verdict !== "pass"} className="rounded-lg border border-border bg-surface-2">
           <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-medium">
-            {t.verdict === "pass" ? <CheckCircle2 className="size-3.5 text-success" aria-hidden /> : t.verdict === "not_run" ? <Clock className="size-3.5 text-muted" aria-hidden /> : <XCircle className="size-3.5 text-danger" aria-hidden />}
-            {t.hidden ? "First failing hidden test" : `Example ${t.index + 1}`} — {t.verdict.replace("_", " ")}
+            {t.verdict === "pass" ? <CheckCircle2 className="size-3.5 text-success" aria-hidden /> : t.verdict === "not_run" ? <Clock className="size-3.5 text-muted" aria-hidden /> : t.verdict === "too_slow" ? <Clock className="size-3.5 text-warning" aria-hidden /> : <XCircle className="size-3.5 text-danger" aria-hidden />}
+            {t.stress ? "Large worst-case test" : t.hidden ? "First failing hidden test" : `Example ${t.index + 1}`} — {t.verdict.replace("_", " ")}
+            {t.timeMs != null && t.verdict !== "not_run" && <span className="ml-auto font-normal tabular-nums text-muted">{t.timeMs < 1 ? "<1" : Math.round(t.timeMs)} ms</span>}
           </summary>
           {t.input && (
             <dl className="space-y-1 border-t border-border px-3 py-2 font-mono text-xs leading-5">
@@ -103,7 +104,7 @@ function Results({ ws }: { ws: DsaWorkspace }) {
           )}
         </details>
       ))}
-      {hidden.length > 0 && <p className="flex items-center gap-1.5 text-xs text-muted"><Lock className="size-3.5" aria-hidden /> Hidden tests: {hidden.filter((t) => t.verdict === "pass").length}/{hidden.length} passed</p>}
+      {hidden.length > 0 && <p className="flex items-center gap-1.5 text-xs text-muted"><Lock className="size-3.5" aria-hidden /> Hidden tests: {hidden.filter((t) => t.verdict === "pass").length}/{hidden.length} passed{hidden.some((t) => t.stress) ? ` · includes ${hidden.filter((t) => t.stress).length} timed worst-case input` : ""}</p>}
       {o.stdout && (
         <div>
           <p className="mb-1 text-xs font-medium text-muted">Your output (print / console.log)</p>

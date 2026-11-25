@@ -34,6 +34,8 @@ export type Problem = {
   returns: ValueType;
   compare: CompareMode;
   examples: Example[];
+  /** Set by the server when Submit includes a timed worst-case input. */
+  hasStress?: boolean;
 };
 
 export type ExecStatus = "ok" | "compile_error" | "runtime_error" | "timeout" | "unavailable";
@@ -48,12 +50,17 @@ export type ExecResult = {
   message?: string;
 };
 
-export type TestVerdict = "pass" | "fail" | "error" | "not_run";
+/** too_slow: a stress test returned the right answer but took longer than the time budget. */
+export type TestVerdict = "pass" | "fail" | "error" | "not_run" | "too_slow";
 
 export type TestResult = {
   index: number;
   verdict: TestVerdict;
   hidden: boolean;
+  /** Large worst-case input that checks time complexity (Submit only). */
+  stress?: boolean;
+  /** Time of the call itself, measured inside the harness. */
+  timeMs?: number;
   /** Present for sample tests and for the first failing hidden test only. */
   input?: string;
   expected?: string;

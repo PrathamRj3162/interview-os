@@ -4,6 +4,7 @@ import { judge0Execute } from "@/lib/dsa/judge0";
 import { testsFor } from "@/lib/dsa/tests";
 import { buildProgram, encodeStdin, makeNonce } from "@/lib/dsa/harness";
 import { grade } from "@/lib/dsa/grade";
+import { STRESS_BUDGET_MS } from "@/lib/dsa/stress";
 import { assertJudgeQuota, JudgeQuotaError, logEvent, saveWorkspace, summariseOutcome, type Workspace } from "@/lib/dsa/server";
 import { codeBody, loadDsaRoute } from "@/lib/dsa/route-helpers";
 
@@ -12,7 +13,7 @@ export const maxDuration = 60;
 const bodySchema = codeBody.extend({ mode: z.enum(["run", "submit"]) });
 
 /**
- * Run = the statement's sample tests; Submit = samples + hidden tests (and is recorded as a submission).
+ * Run = the statement's sample tests; Submit = samples + hidden tests + timed stress tests (recorded as a submission).
  * Both execute on Judge0 server-side. Python/JavaScript "Run" normally happens in the browser instead.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (mode === "run") await logEvent(supabase, id, user.id, "remote_run", { language, pending: true });
 
   const exec = await judge0Execute(language, buildProgram(language, problem, code, nonce), encodeStdin(language, problem, cases.map((c) => c.input)));
-  const outcome = grade(problem, cases, exec, nonce, "judge0");
+  const outcome = grade(problem, cases, exec, nonce, "judge0", { stressBudgetMs: STRESS_BUDGET_MS[language] });
   if (exec.status === "unavailable") return NextResponse.json({ error: outcome.message, outcome }, { status: 503 });
 
   const summary = summariseOutcome(outcome, mode, language);

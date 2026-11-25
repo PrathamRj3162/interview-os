@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/supabase/server";
 import { loadInterview, loadTurns } from "@/lib/interview/server";
 import { KINDS, PERSONAS } from "@/lib/interview/config";
 import { dsaContextFor, loadEvents, asPhase, initialWorkspace, type Workspace } from "@/lib/dsa/server";
+import { STRESS } from "@/lib/dsa/stress";
 
 export const metadata: Metadata = { title: "Interview" };
 
@@ -20,7 +21,7 @@ export default async function InterviewRoomPage({ params }: { params: Promise<{ 
   if (dsa) {
     const ws = (iv.workspace as Workspace | null) ?? initialWorkspace(dsa.problem, iv.language);
     const hintsUsed = (await loadEvents(supabase, id)).filter((e) => e.type === "hint").length;
-    dsaInit = { problem: dsa.problem, phase: asPhase(iv.phase), language: ws.language, code: ws.code, hintsUsed };
+    dsaInit = { problem: { ...dsa.problem, hasStress: dsa.problem.slug in STRESS }, phase: asPhase(iv.phase), language: ws.language, code: ws.code, hintsUsed };
   }
   return (
     <InterviewRoom

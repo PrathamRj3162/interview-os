@@ -2,13 +2,14 @@ import "server-only";
 import { PROBLEM_BY_SLUG } from "./bank";
 import { SOLUTIONS } from "./solutions";
 import { makeRng, seedFrom } from "./rng";
+import { STRESS } from "./stress";
 import type { Problem } from "./types";
 
-export type TestCase = { input: unknown[]; expected: unknown; hidden: boolean };
+export type TestCase = { input: unknown[]; expected: unknown; hidden: boolean; stress?: boolean };
 
 const cache = new Map<string, TestCase[]>();
 
-/** Samples (from the statement) followed by seeded hidden tests; expected values come from the reference. */
+/** Samples (from the statement), seeded hidden tests, then stress tests; expected values come from the reference. */
 export function testsFor(slug: string): { problem: Problem; tests: TestCase[] } | null {
   const problem = PROBLEM_BY_SLUG[slug];
   const sol = SOLUTIONS[slug];
@@ -21,7 +22,12 @@ export function testsFor(slug: string): { problem: Problem; tests: TestCase[] } 
       expected: sol.ref(...structuredClone(input)),
       hidden: true,
     }));
-    tests = [...samples, ...hidden];
+    // Stress tests go last: if a slow solution hits the judge's time limit, every earlier result is still printed.
+    const stressGen = STRESS[slug];
+    const stress = stressGen ? [stressGen(makeRng(seedFrom(`${slug}:stress`)))].map((input) => ({
+      input, expected: sol.ref(...structuredClone(input)), hidden: true, stress: true,
+    })) : [];
+    tests = [...samples, ...hidden, ...stress];
     cache.set(slug, tests);
   }
   return { problem, tests };

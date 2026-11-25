@@ -49,7 +49,7 @@ export const PROBLEMS: Problem[] = [
     [{ input: [[100, 4, 200, 1, 3, 2]], output: 4, explanation: "The run is 1, 2, 3, 4." }, { input: [[0, 3, 7, 2, 5, 8, 4, 6, 0, 1]], output: 9 }]),
   P("majority-element", "Majority Element", "easy", ["Array", "Voting"], "majorityElement(nums: int[])", "int", "exact",
     "One value appears in more than half of the positions of `nums`. Return it.",
-    ["1 ≤ nums.length ≤ 5·10⁴", "A majority element always exists"],
+    ["1 ≤ nums.length ≤ 10⁵", "A majority element always exists"],
     [{ input: [[3, 2, 3]], output: 3 }, { input: [[2, 2, 1, 1, 1, 2, 2]], output: 2 }]),
   P("move-zeroes", "Move Zeroes", "easy", ["Array", "Two pointers"], "moveZeroes(nums: int[])", "int[]", "exact",
     "Move every `0` in `nums` to the end while keeping the relative order of the non-zero elements, then return the array. Try to do it in place.",
@@ -83,7 +83,7 @@ export const PROBLEMS: Problem[] = [
     [{ input: [[1, 8, 6, 2, 5, 4, 8, 3, 7]], output: 49 }, { input: [[1, 1]], output: 1 }]),
   P("trapping-rain-water", "Trapping Rain Water", "hard", ["Array", "Two pointers", "Stack"], "trap(height: int[])", "int", "exact",
     "`height` describes an elevation map of bars that are 1 unit wide. Return how many units of rain water stay trapped between the bars.",
-    ["1 ≤ n ≤ 2·10⁴", "0 ≤ height[i] ≤ 10⁵"],
+    ["1 ≤ n ≤ 10⁵", "0 ≤ height[i] ≤ 10⁵"],
     [{ input: [[0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]], output: 6 }, { input: [[4, 2, 0, 3, 2, 5]], output: 9 }]),
 
   // ───────────── Sliding window ─────────────
@@ -111,7 +111,7 @@ export const PROBLEMS: Problem[] = [
   // ───────────── Stack ─────────────
   P("valid-parentheses", "Valid Parentheses", "easy", ["Stack", "String"], "isValid(s: string)", "bool", "exact",
     "`s` contains only the characters `()[]{}`. Return `true` if every bracket is closed by the same type of bracket, in the correct order.",
-    ["1 ≤ s.length ≤ 10⁴"],
+    ["1 ≤ s.length ≤ 10⁵"],
     [{ input: ["()"], output: true }, { input: ["()[]{}"], output: true }, { input: ["(]"], output: false }, { input: ["([)]"], output: false }]),
   P("daily-temperatures", "Daily Temperatures", "medium", ["Monotonic stack"], "dailyTemperatures(temps: int[])", "int[]", "exact",
     "For each day, return how many days you have to wait for a strictly warmer temperature. Use `0` if no warmer day follows.",
@@ -159,7 +159,7 @@ export const PROBLEMS: Problem[] = [
   // ───────────── Intervals ─────────────
   P("merge-intervals", "Merge Intervals", "medium", ["Intervals", "Sorting"], "merge(intervals: int[][])", "int[][]", "unordered",
     "Merge every overlapping interval `[start, end]`, including intervals that only touch, and return the resulting non-overlapping intervals.",
-    ["1 ≤ intervals.length ≤ 10⁴", "0 ≤ start ≤ end ≤ 10⁴"],
+    ["1 ≤ intervals.length ≤ 10⁵", "0 ≤ start ≤ end ≤ 10⁹"],
     [{ input: [[[1, 3], [2, 6], [8, 10], [15, 18]]], output: [[1, 6], [8, 10], [15, 18]] }, { input: [[[1, 4], [4, 5]]], output: [[1, 5]] }]),
   P("insert-interval", "Insert Interval", "medium", ["Intervals"], "insert(intervals: int[][], newInterval: int[])", "int[][]", "exact",
     "`intervals` is sorted by start and has no overlaps. Insert `newInterval`, merging wherever necessary, and return the sorted result.",
@@ -171,7 +171,7 @@ export const PROBLEMS: Problem[] = [
     [{ input: [[[1, 2], [2, 3], [3, 4], [1, 3]]], output: 1 }, { input: [[[1, 2], [1, 2], [1, 2]]], output: 2 }, { input: [[[1, 2], [2, 3]]], output: 0 }]),
   P("meeting-rooms-ii", "Meeting Rooms II", "medium", ["Intervals", "Heap", "Sweep line"], "minMeetingRooms(intervals: int[][])", "int", "exact",
     "Each meeting `[start, end)` needs a room from `start` up to, but not including, `end`. Return the minimum number of rooms needed to hold every meeting.",
-    ["1 ≤ intervals.length ≤ 10⁴", "0 ≤ start < end ≤ 10⁶"],
+    ["1 ≤ intervals.length ≤ 10⁵", "0 ≤ start < end ≤ 10⁹"],
     [{ input: [[[0, 30], [5, 10], [15, 20]]], output: 2 }, { input: [[[7, 10], [2, 4]]], output: 1 }]),
 
   // ───────────── Dynamic programming ─────────────
@@ -217,7 +217,7 @@ export const PROBLEMS: Problem[] = [
     [{ input: [[1, 5, 11, 5]], output: true }, { input: [[1, 2, 3, 5]], output: false }]),
   P("jump-game", "Jump Game", "medium", ["Greedy", "Dynamic programming"], "canJump(nums: int[])", "bool", "exact",
     "You start at index 0. From index `i` you can jump forward by at most `nums[i]` steps. Return `true` if you can reach the last index.",
-    ["1 ≤ n ≤ 10⁴", "0 ≤ nums[i] ≤ 10⁵"],
+    ["1 ≤ n ≤ 10⁵", "0 ≤ nums[i] ≤ 10⁵"],
     [{ input: [[2, 3, 1, 1, 4]], output: true }, { input: [[3, 2, 1, 0, 4]], output: false }]),
 
   // ───────────── Graphs ─────────────

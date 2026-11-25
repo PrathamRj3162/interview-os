@@ -2,7 +2,8 @@ import type { Lang, Problem, ValueType } from "./types";
 
 /**
  * Turns a candidate's solution into a complete program that runs every test case in ONE process.
- * Each test prints a marker line `@@R:<nonce>@@<i> <json>` (result) or `@@E:<nonce>@@<i> <msg>` (exception).
+ * Each test prints a marker line `@@R:<nonce>@@<i> <json>` (result) or `@@E:<nonce>@@<i> <msg>` (exception),
+ * preceded by `@@T:<nonce>@@<i> <ms>`: how long the call itself took (input parsing excluded).
  * Anything else on stdout is the candidate's own debug output. The nonce stops debug prints from being
  * mistaken for results; for each index the last marker wins, because ours is printed after the call returns.
  *
@@ -78,7 +79,7 @@ export function encodeStdin(lang: Lang, p: Problem, inputs: unknown[][]): string
 
 // ───────────────────────── Program builders ─────────────────────────
 
-const PY_PRELUDE = `import sys, json, math, heapq, bisect, itertools, functools, collections
+const PY_PRELUDE = `import sys, json, math, time, heapq, bisect, itertools, functools, collections
 from typing import *
 from collections import *
 from functools import lru_cache, cache
@@ -102,7 +103,10 @@ def __main():
         try:
             if fn is None:
                 raise NameError("method ${p.fn} not found — keep the given signature")
+            __t = time.perf_counter()
             r = fn(*args)
+            __ms = (time.perf_counter() - __t) * 1000
+            print("\\n@@T:${nonce}@@%d %.1f" % (i, __ms), flush=True)
             print("\\n@@R:${nonce}@@%d %s" % (i, __ser(r)), flush=True)
         except Exception as e:
             print("\\n@@E:${nonce}@@%d %s: %s" % (i, type(e).__name__, str(e)[:300]), flush=True)
@@ -123,7 +127,11 @@ function javascript(p: Problem, code: string, nonce: string) {
   data.forEach((args, i) => {
     try {
       if (!fn) throw new ReferenceError("function ${p.fn} not found — keep the given signature");
-      console.log("\\n@@R:${nonce}@@" + i + " " + ser(fn(...args)));
+      const clock = typeof performance !== "undefined" ? performance : Date;
+      const t0 = clock.now();
+      const r = fn(...args);
+      console.log("\\n@@T:${nonce}@@" + i + " " + (clock.now() - t0).toFixed(1));
+      console.log("\\n@@R:${nonce}@@" + i + " " + ser(r));
     } catch (e) {
       console.log("\\n@@E:${nonce}@@" + i + " " + String(e && e.name ? e.name + ": " + e.message : e).slice(0, 300));
     }
@@ -178,7 +186,10 @@ int main() {
     ${decl}
     try {
       Solution s;
+      auto __t0 = chrono::steady_clock::now();
       auto r = s.${p.fn}(${args});
+      double __ms = chrono::duration<double, milli>(chrono::steady_clock::now() - __t0).count();
+      cout << "\\n@@T:${nonce}@@" << t << " " << fixed << setprecision(1) << __ms << defaultfloat << endl;
       cout << "\\n@@R:${nonce}@@" << t << " " << __io::js(r) << endl;
     } catch (const exception& e) {
       cout << "\\n@@E:${nonce}@@" << t << " exception: " << e.what() << endl;
@@ -250,7 +261,10 @@ ${JAVA_IO}
     for (int t = 0; t < T; t++) {
       ${decl}
       try {
+        long __t0 = System.nanoTime();
         Object r = new Solution().${p.fn}(${args});
+        long __ns = System.nanoTime() - __t0;
+        System.out.println("\\n@@T:${nonce}@@" + t + " " + (__ns / 100000) / 10.0);
         System.out.println("\\n@@R:${nonce}@@" + t + " " + ser(r));
       } catch (Throwable e) {
         System.out.println("\\n@@E:${nonce}@@" + t + " " + e.toString().substring(0, Math.min(300, e.toString().length())));
@@ -281,15 +295,17 @@ export function makeNonce(): string {
 
 export type ParsedLine = { kind: "ok"; raw: string; value: unknown } | { kind: "error"; message: string } | { kind: "missing" };
 
-export function parseOutput(stdout: string, count: number, nonce: string): { results: ParsedLine[]; userOutput: string } {
+export function parseOutput(stdout: string, count: number, nonce: string): { results: ParsedLine[]; times: (number | null)[]; userOutput: string } {
   const results: ParsedLine[] = Array.from({ length: count }, () => ({ kind: "missing" as const }));
-  const re = new RegExp(`^@@([RE]):${nonce}@@(\\d+) ?(.*)$`);
+  const times: (number | null)[] = Array.from({ length: count }, () => null);
+  const re = new RegExp(`^@@([RET]):${nonce}@@(\\d+) ?(.*)$`);
   const user: string[] = [];
   for (const line of stdout.split("\n")) {
     const m = re.exec(line);
     if (!m) { user.push(line); continue; }
     const i = Number(m[2]);
     if (i < 0 || i >= count) continue;
+    if (m[1] === "T") { const ms = Number(m[3]); times[i] = Number.isFinite(ms) && ms >= 0 ? ms : null; continue; }
     if (m[1] === "E") results[i] = { kind: "error", message: m[3] };
     else {
       try { results[i] = { kind: "ok", raw: m[3], value: JSON.parse(m[3]) }; }
@@ -298,7 +314,7 @@ export function parseOutput(stdout: string, count: number, nonce: string): { res
   }
   // Our markers start with a newline; drop the blank lines that leaves behind.
   const userOutput = user.join("\n").replace(/\n{2,}/g, "\n").trim();
-  return { results, userOutput: userOutput.slice(0, 4000) };
+  return { results, times, userOutput: userOutput.slice(0, 4000) };
 }
 
 // ───────────────────────── Line numbers ─────────────────────────
