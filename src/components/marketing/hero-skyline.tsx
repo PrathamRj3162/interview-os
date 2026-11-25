@@ -44,13 +44,16 @@ export function HeroSkyline() {
           ))}
         </g>
       </svg>
-      {/* perspective grid floor */}
-      <div className="absolute inset-x-0 bottom-0 h-[24%] [perspective:400px]">
-        <div
-          className="absolute inset-x-[-50%] top-0 h-[220%] origin-top [transform:rotateX(68deg)]"
-          style={{ backgroundImage: "linear-gradient(rgb(255 79 216 / 0.35) 1px, transparent 1px), linear-gradient(90deg, rgb(61 220 255 / 0.25) 1px, transparent 1px)", backgroundSize: "56px 56px" }}
-        />
-      </div>
+      {/* perspective grid floor as static SVG lines (a CSS 3D transform here cost ~3s of paint on mobile) */}
+      <svg className="absolute inset-x-0 bottom-0 h-[24%] w-full" viewBox="0 0 1440 200" preserveAspectRatio="none">
+        {Array.from({ length: 25 }, (_, i) => {
+          const x = -1440 + i * 120;
+          return <line key={`v${i}`} x1={720 + (x - 720) * 0.08} y1="0" x2={x} y2="200" stroke="#3ddcff" strokeOpacity="0.22" strokeWidth="1" vectorEffect="non-scaling-stroke" />;
+        })}
+        {[0, 8, 20, 36, 58, 86, 122, 166].map((y, i) => (
+          <line key={`h${i}`} x1="0" y1={y} x2="1440" y2={y} stroke="#ff4fd8" strokeOpacity={0.12 + i * 0.03} strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        ))}
+      </svg>
       <div className="scanlines absolute inset-0 opacity-60" />
       {/* dark overlay keeps text AA-readable */}
       <div className="absolute inset-0 bg-gradient-to-b from-bg/60 via-bg/30 to-bg" />

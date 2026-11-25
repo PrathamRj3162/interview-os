@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from "@/lib/env";
 export async function SiteHeader() {
   const user = isSupabaseConfigured() ? (await getCurrentUser()).user : null;
   return (
-    <header className="sticky top-0 z-40 border-b border-border bg-bg/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border bg-bg/95">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4">
         <Logo />
         <nav className="flex items-center gap-2">
