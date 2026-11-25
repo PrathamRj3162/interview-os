@@ -26,7 +26,8 @@ export function buildCsp(nonce: string, opts: { dev?: boolean } = {}) {
   return directives.join("; ");
 }
 
+/** Enforced by default (validated in report-only mode first: zero violations). CSP_MODE=report-only|off to relax. */
 export const cspMode = (): "report-only" | "enforce" | "off" => {
   const m = process.env.CSP_MODE;
-  return m === "enforce" || m === "off" ? m : "report-only";
+  return m === "report-only" || m === "off" ? m : "enforce";
 };
