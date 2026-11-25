@@ -1,54 +1,105 @@
 @import "tailwindcss";
 
-/* Design tokens — light first, dark via prefers-color-scheme. */
-:root {
-  --bg: #fafafa;
-  --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --border: #e4e4e7;
-  --text: #18181b;
-  --muted: #71717a;
-  --accent: #4f46e5;
-  --accent-fg: #ffffff;
-  --accent-soft: #eef2ff;
-  --success: #059669;
-  --warning: #d97706;
-  --danger: #dc2626;
+/*
+ * Interview OS design tokens — "neon-retro, grown-up".
+ * 80% calm dev tool, 20% neon flavour (hero, logo, primary CTA, focus glow).
+ * Themes: neon (default, dark) and contrast (high-contrast dark). Set via <html data-theme>.
+ * All text pairings below meet WCAG AA on their intended backgrounds (see /design).
+ */
+:root,
+[data-theme="neon"] {
+  color-scheme: dark;
+  --bg: #0b0a12;
+  --surface: #13121c;
+  --surface-2: #1b1a27;
+  --surface-3: #242233;
+  --border: #2a2838;
+  --border-strong: #3a3750;
+  --text: #eceaf4;
+  --muted: #9a97ad;          /* 6.6:1 on --bg */
+  --primary: #ffd43b;        /* neon yellow: the one primary action */
+  --primary-fg: #14110a;     /* 13.9:1 on --primary */
+  --primary-shadow: #a88400;
+  --accent: #a78bfa;         /* electric violet: links, active, focus — 6.9:1 on --bg */
+  --accent-fg: #0b0a12;
+  --accent-soft: rgb(167 139 250 / 0.12);
+  --glow-pink: #ff4fd8;
+  --glow-cyan: #3ddcff;
+  --success: #34d399;
+  --warning: #fb923c;
+  --danger: #f87171;
+  --info: #60a5fa;
+  --focus-glow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent), 0 0 18px 2px rgb(167 139 250 / 0.45);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #09090b;
-    --surface: #111113;
-    --surface-2: #18181b;
-    --border: #27272a;
-    --text: #fafafa;
-    --muted: #a1a1aa;
-    --accent: #818cf8;
-    --accent-fg: #09090b;
-    --accent-soft: #1e1b4b;
-    --success: #34d399;
-    --warning: #fbbf24;
-    --danger: #f87171;
-    color-scheme: dark;
-  }
+[data-theme="contrast"] {
+  --bg: #000000;
+  --surface: #0a0a0a;
+  --surface-2: #141414;
+  --surface-3: #1f1f1f;
+  --border: #5a5a5a;
+  --border-strong: #8a8a8a;
+  --text: #ffffff;
+  --muted: #d4d4d4;
+  --primary: #ffe066;
+  --primary-fg: #000000;
+  --primary-shadow: #ffffff;
+  --accent: #c4b5fd;
+  --accent-fg: #000000;
+  --accent-soft: rgb(196 181 253 / 0.18);
+  --success: #6ee7b7;
+  --warning: #fdba74;
+  --danger: #fca5a5;
+  --info: #93c5fd;
+  --focus-glow: 0 0 0 2px #000, 0 0 0 4px #fff;
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-text: var(--text);
   --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
+  --color-glow-pink: var(--glow-pink);
+  --color-glow-cyan: var(--glow-cyan);
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  --color-info: var(--info);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-pixel);
+
+  /* Type scale (rem): 12 / 14 / 16 / 18 / 20 / 24 / 30 / 36 / 48 / 60 */
+  --text-display: 3.75rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.03) inset, 0 8px 24px -12px rgb(0 0 0 / 0.6);
+  --shadow-retro: 3px 3px 0 0 var(--primary-shadow);
+  --shadow-retro-pressed: 1px 1px 0 0 var(--primary-shadow);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  --animate-caret: caret 1.1s steps(1) infinite;
+  @keyframes caret {
+    50% { opacity: 0; }
+  }
 }
 
 body {
@@ -59,6 +110,25 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: var(--focus-glow);
+  border-radius: var(--radius-sm);
+}
+
+::selection {
+  background: rgb(167 139 250 / 0.35);
+}
+
+/* Low-opacity scanlines + grain for hero sections only. */
+.scanlines {
+  background-image: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.035) 0 1px, transparent 1px 3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
