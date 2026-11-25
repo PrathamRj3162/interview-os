@@ -34,15 +34,22 @@ async function login(page: Page) {
 test("resume: rejects invalid files, analyses a real PDF, generates verbatim claims", async ({ page }) => {
   await login(page);
   await page.goto("/resume");
+  await page.waitForLoadState("networkidle"); // hydrate before attaching a file, or the change event is lost
+  // Attach a file and wait for the form to accept it (re-attach once if a re-render swallowed the change).
+  const upload = async (file: Parameters<Page["setInputFiles"]>[1]) => {
+    const button = page.getByRole("button", { name: "Upload and analyse" });
+    await page.setInputFiles("#resume", file);
+    if (!(await button.isEnabled())) { await page.waitForTimeout(500); await page.setInputFiles("#resume", file); }
+    await expect(button).toBeEnabled({ timeout: 10_000 });
+    await button.click();
+  };
 
   // Invalid file (text renamed to .pdf) is rejected by magic-byte sniffing
-  await page.setInputFiles("#resume", { name: "fake.pdf", mimeType: "application/pdf", buffer: Buffer.from("hello, not a pdf ".repeat(50)) });
-  await page.getByRole("button", { name: "Upload and analyse" }).click();
+  await upload({ name: "fake.pdf", mimeType: "application/pdf", buffer: Buffer.from("hello, not a pdf ".repeat(50)) });
   await expect(page.getByText("Only PDF and DOCX resumes are supported.")).toBeVisible({ timeout: 15_000 });
 
   // Real PDF
-  await page.setInputFiles("#resume", { name: "Asha_Rao_Resume.pdf", mimeType: "application/pdf", buffer: makePdf(SAMPLE_RESUME) });
-  await page.getByRole("button", { name: "Upload and analyse" }).click();
+  await upload({ name: "Asha_Rao_Resume.pdf", mimeType: "application/pdf", buffer: makePdf(SAMPLE_RESUME) });
   await expect(page).toHaveURL(/\/resume\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   await expect(page.getByText("How the score was calculated")).toBeVisible();
   await expect(page.getByText(/Kubernetes/).first()).toBeVisible(); // listed but unused skill
