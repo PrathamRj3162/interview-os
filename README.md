@@ -10,6 +10,8 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 |---|---|
 | ![Resume report](docs/screenshots/resume-report.png) | ![Interview setup](docs/screenshots/interview-setup.png) |
 
+![DSA live-coding round](docs/screenshots/dsa-room.png)
+
 ## Features
 
 | Module | Status |
@@ -21,14 +23,16 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | Voice mode (browser speech recognition + speech synthesis, turn-based, barge-in, text fallback) | ✅ |
 | **Reports**: rubric per round, evidence quotes checked against your transcript, deterministic overall score, per-question feedback, filler-word stats | ✅ |
 | Dashboard: today's tasks from report priorities, data-driven next step | ✅ |
+| **DSA live-coding round**: problem \| editor \| interviewer, CodeMirror 6 (Python/JS/C++/Java), 59 problems with hidden tests, Run in the browser (Pyodide/JS) or on Judge0, Submit on Judge0, code-aware interviewer with a phase machine, graded hints | ✅ |
 | Neon-retro design system: themes (Neon / High contrast), Gen-Z / Professional copy toggle, focus mode, keyboard shortcuts | ✅ |
-| DSA live-coding round with code execution, CS fundamentals, system design lab, analytics | 🚧 planned |
+| Report v2 with hire verdict, tiers/XP, voice v2, CS fundamentals, system design lab, analytics | 🚧 planned |
 
 ## Tech stack
 
 - **Next.js 16** (App Router, Server Actions, `proxy.ts`), React 19, TypeScript (strict), Tailwind CSS 4
 - **Supabase**: Postgres with Row Level Security on every table, Auth, private Storage
 - **AI**: provider-agnostic adapter over OpenAI-compatible APIs. Fallback chain: Gemini (free tier) → Groq → OpenRouter `:free` models → Ollama. It never routes to a paid model.
+- **Code execution**: Pyodide + Web Workers in the browser; [Judge0](https://judge0.com) (public CE by default, self-hostable) on the server
 - **zod** validation on every action/route and on every AI response
 - **Vitest** unit tests, **Playwright** end-to-end tests on a deterministic mock AI (no quota used), GitHub Actions CI, gitleaks secret scan
 - Hosted on **Vercel** (Hobby)
@@ -47,6 +51,7 @@ src/
   lib/resume/               PDF/DOCX extraction, deterministic resume rules
   lib/interview/            personas, rubrics, interviewer engine, evaluator, transcript analysis
   lib/services/             AI resume analysis
+  lib/dsa/                  problem bank, harnesses, graders, Judge0 + browser runners, phase machine
 supabase/migrations/        schema, RLS, storage policies (apply in order)
 tests/                      Vitest unit tests
 e2e/                        Playwright tests (+ a real-PDF generator)

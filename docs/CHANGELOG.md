@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.4.0 — 2026-11-25 · DSA live-coding round
+- New "DSA & live coding" round: resizable problem | editor | interviewer layout (tabs on mobile), focus mode by default.
+- CodeMirror 6 editor for Python, JavaScript, C++ and Java: starter code per signature, per-language autosave (browser + server), reset, Ctrl/⌘+' Run, Ctrl/⌘+Shift+Enter Submit.
+- 59 problems with original statements, typed signatures, 3 graded hints each, and seeded hidden tests whose expected outputs come from reference solutions.
+- Code execution: Python (Pyodide) and JavaScript run the examples in a browser Web Worker; C++/Java runs and every Submit use Judge0 (public CE by default, `JUDGE0_URL` for self-hosted). One process runs all tests, per-test verdicts, first failing hidden test revealed, compiler/runtime line numbers mapped to your code.
+- Code-aware interviewer: sees your code, the diff since your last message, run/submit results, pastes, idle stretches, language switches and hints.
+- Server-side phase machine: intro → clarify → brute force → optimise → code → test → complexity → wrap-up (deterministic signals + the model's suggestion; forward only).
+- Practice mode: 3 pre-written graded hints per problem (no AI call), logged. Mock mode: no hints.
+- Report: objective coding facts (judge result, runs, hints, pastes, phases reached, optimal approach, final code).
+- Migration 0004 (interview_events with append-only RLS, phase/problem/workspace columns, submission results); per-user judge limit (`JUDGE_DAILY_LIMIT`, default 80/day) and a 4 s cooldown.
+
+## 0.3.0 — 2026-11-25 · Neon-retro redesign
+- Design tokens (Neon / High contrast), component kit and /design page; new landing; grouped "coming soon" sidebar; 3-step interview setup; focus mode and keyboard shortcuts in the room; skeleton/error states; WCAG AA contrast test; Lighthouse 97/100/100.
+
 ## 0.2.0 — 2026-11-25 · Resume intelligence + mock interviews
 - Resume upload (PDF/DOCX ≤5 MB, content-sniffed), private storage, signed downloads, deletion.
 - Deterministic resume score with per-check explanation; unsupported-skill and missing-keyword detection.
