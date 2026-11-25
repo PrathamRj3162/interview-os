@@ -1,0 +1,26 @@
+import { test } from "@playwright/test";
+import { ensureConfirmedUser, deleteUserIfExists, admin } from "./helpers";
+import { makePdf, SAMPLE_RESUME } from "./make-pdf";
+
+/** Regenerates README screenshots: `npx playwright test e2e/screenshots.spec.ts`. Uses no AI calls. */
+const EMAIL = `interview-os-shots-${Date.now()}@example.com`, PW = "Shots-pass-12345";
+test.skip(!!process.env.CI, "local only");
+test.setTimeout(180_000);
+test.afterAll(async () => { await deleteUserIfExists(EMAIL); });
+
+test("capture screenshots", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const shot = (name: string) => page.screenshot({ path: `docs/screenshots/${name}.png`, fullPage: false });
+  await page.goto("/"); await shot("landing");
+  const id = await ensureConfirmedUser(EMAIL, PW, "Asha Rao");
+  await admin().from("profiles").update({ full_name: "Asha Rao", target_role: "backend", experience_level: "student", company_track: "product", target_companies: ["Amazon", "Google"], preferred_language: "python", daily_hours: 3, dsa_level: 3, system_design_level: 2, learning_style: "mixed", onboarded_at: new Date().toISOString() }).eq("id", id);
+  await page.goto("/login"); await page.getByLabel("Email").fill(EMAIL); await page.getByLabel("Password").fill(PW);
+  await page.getByRole("button", { name: "Sign in" }).click(); await page.waitForURL(/dashboard/);
+  await page.goto("/resume");
+  await page.setInputFiles("#resume", { name: "Asha_Rao_Resume.pdf", mimeType: "application/pdf", buffer: makePdf(SAMPLE_RESUME) });
+  await page.getByRole("button", { name: "Upload and analyse" }).click();
+  await page.waitForURL(/\/resume\/[0-9a-f-]{36}$/);
+  await page.getByText("How the score was calculated").scrollIntoViewIfNeeded(); await shot("resume-report");
+  await page.goto("/interview/new"); await shot("interview-setup");
+  await page.goto("/dashboard"); await shot("dashboard");
+});
