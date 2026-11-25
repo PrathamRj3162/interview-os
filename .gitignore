@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+!.env.example
+/test-results/
+/playwright-report/
+
+# playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# editors / OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
