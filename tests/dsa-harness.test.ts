@@ -16,7 +16,11 @@ const dir = mkdtempSync(path.join(tmpdir(), "ios-harness-"));
 // Judge0 uses GCC, which ships <bits/stdc++.h>; macOS clang doesn't, so provide a shim for local runs.
 const shim = path.join(dir, "include");
 mkdirSync(path.join(shim, "bits"), { recursive: true });
-writeFileSync(path.join(shim, "bits", "stdc++.h"), ["algorithm", "array", "bitset", "cassert", "climits", "cmath", "cstdio", "cstdlib", "cstring", "deque", "functional", "iomanip", "iostream", "list", "map", "numeric", "queue", "set", "sstream", "stack", "string", "tuple", "unordered_map", "unordered_set", "utility", "vector"].map((h) => `#include <${h}>`).join("\n"));
+writeFileSync(path.join(shim, "bits", "stdc++.h"), ["algorithm", "array", "bitset", "cassert", "chrono", "climits", "cmath", "cstdio", "cstdlib", "cstring", "deque", "functional", "iomanip", "iostream", "iterator", "limits", "list", "map", "numeric", "queue", "random", "set", "sstream", "stack", "stdexcept", "string", "tuple", "unordered_map", "unordered_set", "utility", "vector"].map((h) => `#include <${h}>`).join("\n"));
+// Only use the shim when the compiler lacks the real header (GCC on Linux/CI has it, like Judge0).
+writeFileSync(path.join(dir, "probe.cpp"), "#include <bits/stdc++.h>\nint main() { return 0; }\n");
+const NATIVE_STDCPP = spawnSync("g++", ["-std=c++17", "-fsyntax-only", path.join(dir, "probe.cpp")]).status === 0;
+const CPP_INCLUDE = NATIVE_STDCPP ? [] : ["-I", shim];
 const has = (cmd: string, args: string[]) => spawnSync(cmd, args).status === 0;
 const HAS = { python: has("python3", ["--version"]), cpp: has("g++", ["--version"]), java: has("javac", ["-version"]) && has("java", ["-version"]), javascript: true };
 
@@ -29,7 +33,7 @@ function execLocal(lang: Lang, program: string, stdin: string, name: string): { 
   else if (lang === "javascript") { writeFileSync(path.join(d, "main.js"), program); r = run("node", ["main.js"]); }
   else if (lang === "cpp") {
     writeFileSync(path.join(d, "main.cpp"), program);
-    const c = spawnSync("g++", ["-std=c++17", "-O2", "-I", shim, "-o", "main", "main.cpp"], { cwd: d });
+    const c = spawnSync("g++", ["-std=c++17", "-O2", ...CPP_INCLUDE, "-o", "main", "main.cpp"], { cwd: d });
     if (c.status !== 0) return { stdout: "", stderr: c.stderr.toString(), status: -1 };
     r = run(path.join(d, "main"), []);
   } else {
