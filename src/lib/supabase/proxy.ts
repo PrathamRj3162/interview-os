@@ -1,0 +1,60 @@
+import { createServerClient } from "@supabase/ssr";
+import { NextResponse, type NextRequest } from "next/server";
+import { publicEnv, isSupabaseConfigured } from "@/lib/env";
+
+const PROTECTED_PREFIXES = [
+  "/dashboard",
+  "/onboarding",
+  "/settings",
+  "/resume",
+  "/dsa",
+  "/fundamentals",
+  "/system-design",
+  "/projects",
+  "/interview",
+  "/planner",
+  "/analytics",
+  "/revision",
+];
+const AUTH_PAGES = ["/login", "/signup"];
+
+/** Refreshes the auth session cookie and performs optimistic route guarding. */
+export async function updateSession(request: NextRequest) {
+  let response = NextResponse.next({ request });
+  if (!isSupabaseConfigured()) return response;
+
+  const supabase = createServerClient(publicEnv.supabaseUrl, publicEnv.supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet, headers) {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
+        response = NextResponse.next({ request });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+        Object.entries(headers ?? {}).forEach(([k, v]) => response.headers.set(k, v));
+      },
+    },
+  });
+
+  // getClaims() verifies the JWT signature; do not run code between client creation and this call.
+  const { data } = await supabase.auth.getClaims();
+  const isAuthed = Boolean(data?.claims?.sub);
+  const path = request.nextUrl.pathname;
+
+  if (!isAuthed && PROTECTED_PREFIXES.some((p) => path === p || path.startsWith(p + "/"))) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", path);
+    return NextResponse.redirect(url);
+  }
+  if (isAuthed && AUTH_PAGES.includes(path)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+  return response;
+}

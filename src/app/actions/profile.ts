@@ -1,0 +1,64 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { createClient, createAdminClient, getCurrentUser } from "@/lib/supabase/server";
+import { profileSchema, profileFromFormData } from "@/lib/validation/profile";
+import { fieldErrorsFrom, type ActionState } from "./types";
+
+export async function saveProfile(_: ActionState, fd: FormData): Promise<ActionState> {
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
+  const raw = profileFromFormData(fd) as Record<string, unknown>;
+  const parsed = profileSchema.safeParse(raw);
+  if (!parsed.success) return { values: raw, fieldErrors: fieldErrorsFrom(parsed.error.issues) };
+
+  const isOnboarding = fd.get("mode") === "onboarding";
+  const { error } = await supabase
+    .from("profiles")
+    .update({ ...parsed.data, ...(isOnboarding ? { onboarded_at: new Date().toISOString() } : {}) })
+    .eq("id", user.id);
+  if (error) return { values: raw, message: "Could not save your profile. Please try again." };
+
+  revalidatePath("/", "layout");
+  if (isOnboarding) redirect("/dashboard");
+  return { ok: true, message: "Profile saved." };
+}
+
+export async function setAiConsent(_: ActionState, fd: FormData): Promise<ActionState> {
+  const { supabase, user } = await getCurrentUser();
+  if (!user) redirect("/login");
+  const consent = fd.get("ai_resume_consent") === "on";
+  const { error } = await supabase.from("profiles").update({ ai_resume_consent: consent }).eq("id", user.id);
+  if (error) return { message: "Could not update consent." };
+  revalidatePath("/settings");
+  return { ok: true, message: consent ? "AI processing of your resume is enabled." : "AI processing of your resume is disabled." };
+}
+
+/** Permanently deletes the account, all rows (FK cascade) and all stored resume files. */
+export async function deleteAccount(_: ActionState, fd: FormData): Promise<ActionState> {
+  const { user } = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (fd.get("confirm") !== "DELETE") return { fieldErrors: { confirm: 'Type DELETE to confirm' } };
+
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    return { message: "Account deletion is not configured on this server. Contact the maintainer." };
+  }
+
+  const { data: files } = await admin.storage.from("resumes").list(user.id, { limit: 1000 });
+  const { error } = await admin.auth.admin.deleteUser(user.id);
+  if (error) return { message: "Deletion failed. Nothing was removed from your account; please try again." };
+  if (files && files.length > 0) {
+    const { error: storageError } = await admin.storage
+      .from("resumes")
+      .remove(files.map((f) => `${user.id}/${f.name}`));
+    if (storageError) console.error("[delete-account] storage cleanup failed for a deleted user");
+  }
+
+  const supabase = await createClient();
+  await supabase.auth.signOut();
+  redirect("/?deleted=1");
+}
