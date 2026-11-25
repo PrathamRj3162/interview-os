@@ -292,7 +292,63 @@ export type EvaluationContext = {
   coding?: CodingFacts;
   /** Final code to annotate (DSA final code, or the last code sent in other rounds). */
   code?: { language: string; source: string };
+  /** Progress callback for the report screen (real stages, not a timer). */
+  onStage?: (stage: string) => void;
 };
+
+/** Runs async jobs with at most `limit` in flight. */
+async function pool<T>(jobs: (() => Promise<T>)[], limit: number): Promise<PromiseSettledResult<T>[]> {
+  const out: PromiseSettledResult<T>[] = new Array(jobs.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, async () => {
+    while (next < jobs.length) {
+      const i = next++;
+      try { out[i] = { status: "fulfilled", value: await jobs[i]() }; } catch (reason) { out[i] = { status: "rejected", reason }; }
+    }
+  }));
+  return out;
+}
+
+/**
+ * Fallback evaluation: the same rubric, split into small calls (two categories per call, one call for the
+ * overall feedback, one for per-question feedback, one for code notes), at most three at a time. A category
+ * whose call fails stays unscored — never guessed. Only the overall call is required.
+ */
+async function chunkedEvaluation(a: {
+  iv: InterviewRow; rubric: { id: string; name: string; desc: string }[]; rubricLinesFor: (ids: string[]) => string[];
+  intro: string[]; scoringRule: string; evidenceRule: string; codeRule: string; commsRule: string; noVerdict: string;
+  context: ChatMessage[]; hasCode: boolean; onStage?: (s: string) => void;
+}): Promise<{ data: z.infer<typeof evalSchema>; provider: string; model: string }> {
+  const groups: string[][] = [];
+  for (let i = 0; i < a.rubric.length; i += 2) groups.push(a.rubric.slice(i, i + 2).map((r) => r.id));
+  const sys = (lines: string[]) => ({ role: "system" as const, content: [...a.intro, ...lines].join("\n") });
+  const catSchema = evalSchema.pick({ categories: true });
+  const overallSchema = evalSchema.pick({ summary: true, strengths: true, weaknesses: true, mistakes: true, missed_concepts: true, drills: true, communication_comment: true });
+  const questionSchema = evalSchema.pick({ questions: true });
+  const codeSchema = evalSchema.pick({ code_notes: true });
+  let scored = 0;
+  const catJobs = groups.map((ids) => async () => {
+    const r = await generateObject(catSchema, [sys([a.scoringRule, ...a.rubricLinesFor(ids), a.evidenceRule, a.noVerdict, `Score ONLY these categories: ${ids.join(", ")}. Return JSON {"categories": [{id, score, evidence, comment, fix}]}.`]), ...a.context], { temperature: 0.2, maxTokens: 1500 });
+    a.onStage?.(`Scored ${(scored += ids.length)}/${a.rubric.length} rubric categories`);
+    return r;
+  });
+  const overallJob = async () => generateObject(overallSchema, [sys([a.commsRule, a.noVerdict, "drills: exactly 3 practice drills targeting the weakest areas, each {title, how (specific steps), minutes, kind}; kind is one of dsa, lesson, quiz, system_design, project, mock, revision, resume.", "Return JSON with keys: summary, strengths, weaknesses, mistakes, missed_concepts, drills, communication_comment."]), ...a.context], { temperature: 0.2, maxTokens: 2500 });
+  const questionJob = async () => generateObject(questionSchema, [sys(["For each question index, list briefly what was correct / incomplete / technically incorrect / missing, what a strong answer would contain, topics to study and a likely follow-up. Keep each item short.", 'Return JSON {"questions": [{index, correct, incomplete, incorrect, missing, strong_answer, better_structure, study, follow_ups}]}.']), ...a.context], { temperature: 0.2, maxTokens: 3500 });
+  const codeJob = async () => generateObject(codeSchema, [sys([a.codeRule, 'Return JSON {"code_notes": [...]}.']), ...a.context], { temperature: 0.2, maxTokens: 1500 });
+  const [overall, ...rest] = await pool<{ data: Record<string, unknown>; provider: string; model: string }>(
+    [overallJob, ...catJobs, questionJob, ...(a.hasCode ? [codeJob] : [])] as (() => Promise<{ data: Record<string, unknown>; provider: string; model: string }>)[], 3);
+  if (overall.status !== "fulfilled") throw overall.reason;
+  const cats = rest.slice(0, catJobs.length).flatMap((r) => (r.status === "fulfilled" ? ((r.value.data as z.infer<typeof catSchema>).categories) : []));
+  const q = rest[catJobs.length];
+  const c = a.hasCode ? rest[catJobs.length + 1] : undefined;
+  const data = {
+    ...(overall.value.data as z.infer<typeof overallSchema>),
+    categories: cats,
+    questions: q?.status === "fulfilled" ? (q.value.data as z.infer<typeof questionSchema>).questions : [],
+    code_notes: c?.status === "fulfilled" ? (c.value.data as z.infer<typeof codeSchema>).code_notes : [],
+  } as z.infer<typeof evalSchema>;
+  return { data, provider: overall.value.provider, model: `${overall.value.model} (in parts)` };
+}
 
 const SUB_LABEL: Record<string, string> = { accepted: "Accepted", wrong_answer: "Wrong answer", runtime_error: "Runtime error", compile_error: "Compile error", time_limit: "Too slow / time limit", error: "Error" };
 
@@ -323,29 +379,46 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
 
   const code = ctx.code?.source.trim() ? { ...ctx.code, source: ctx.code.source.slice(0, 12000) } : undefined;
 
-  const { data, provider, model } = await generateObject(evalSchema, [
-    {
-      role: "system",
-      content: [
-        `You are an experienced interviewer writing a rigorous, fair evaluation of a ${KINDS[iv.kind].name} (difficulty: ${iv.difficulty}, target role context: ${iv.company ?? "general"}).`,
-        "Evaluate ONLY what the candidate actually said or wrote. Never invent statements, never assume knowledge that wasn't demonstrated.",
-        "Rubric — score each category 1–4 using its ANCHORS below (pick the anchor that best matches the evidence; there is no middle option). If the transcript gives no evidence for a category, use score null.",
-        ...rubricLines,
-        "For each category: `evidence` = 1–3 SHORT EXACT QUOTES (3–25 words) copied from the candidate's answers that justify the score; `comment` = one or two sentences; `fix` = ONE concrete, specific action that would move this category up one level next time.",
-        "For each question index, list what was correct / incomplete / technically incorrect / missing, describe what a strong answer would contain, suggest a better answer structure, topics to study, and realistic follow-ups.",
-        "drills: exactly 3 practice drills targeting the weakest areas, each {title, how (specific steps), minutes, kind}; kind is one of dsa, lesson, quiz, system_design, project, mock, revision, resume.",
-        code
-          ? "code_notes: up to 8 annotations of the candidate's FINAL CODE (lines are numbered). Each {line, quote (the exact code text on that line, at least a few characters), kind (bug | edge_case | complexity | style | good), note (one sentence)}. Prioritise real bugs and missed edge cases; include at most 2 'good' notes."
-          : "code_notes: [] (no code in this round).",
-        "Communication: judge structure, relevance, clarity and conciseness only. Do NOT comment on accent, voice, personality, intelligence or honesty.",
-        "Do NOT give an overall verdict or hiring recommendation; the platform computes it from your category scores.",
-        "Return JSON with keys: summary, categories[{id,score,evidence,comment,fix}], questions[{index,...}], strengths, weaknesses, mistakes, missed_concepts, drills, code_notes, communication_comment.",
-      ].join("\n"),
-    },
+  const intro = [
+    `You are an experienced interviewer writing a rigorous, fair evaluation of a ${KINDS[iv.kind].name} (difficulty: ${iv.difficulty}, target role context: ${iv.company ?? "general"}).`,
+    "Evaluate ONLY what the candidate actually said or wrote. Never invent statements, never assume knowledge that wasn't demonstrated.",
+  ];
+  const evidenceRule = "For each category: `evidence` = 1–3 SHORT EXACT QUOTES (3–25 words) copied from the candidate's answers that justify the score; `comment` = one or two sentences; `fix` = ONE concrete, specific action that would move this category up one level next time.";
+  const scoringRule = "Rubric — score each category 1–4 using its ANCHORS below (pick the anchor that best matches the evidence; there is no middle option). If the transcript gives no evidence for a category, use score null.";
+  const codeRule = code
+    ? "code_notes: up to 8 annotations of the candidate's FINAL CODE (lines are numbered). Each {line, quote (the exact code text on that line, at least a few characters), kind (bug | edge_case | complexity | style | good), note (one sentence)}. Prioritise real bugs and missed edge cases; include at most 2 'good' notes."
+    : "code_notes: [] (no code in this round).";
+  const commsRule = "Communication: judge structure, relevance, clarity and conciseness only. Do NOT comment on accent, voice, personality, intelligence or honesty.";
+  const noVerdict = "Do NOT give an overall verdict or hiring recommendation; the platform computes it from your category scores.";
+  const context: ChatMessage[] = [
     { role: "user", content: untrusted("interview_transcript", transcript) },
     ...(ctx.facts ? [{ role: "user" as const, content: `Objective facts recorded by the platform (code judge results, hints, editor events, timings) — use them, they are not candidate claims:\n${untrusted("platform_facts", ctx.facts)}` }] : []),
     ...(code ? [{ role: "user" as const, content: `The candidate's final code (${code.language}), with line numbers:\n${untrusted("final_code", numberLines(code.source))}` }] : []),
-  ], { temperature: 0.2, maxTokens: 9000 });
+  ];
+
+  let data: z.infer<typeof evalSchema>;
+  let provider: string, model: string;
+  try {
+    ({ data, provider, model } = await generateObject(evalSchema, [
+      {
+        role: "system",
+        content: [
+          ...intro, scoringRule, ...rubricLines, evidenceRule,
+          "For each question index, list what was correct / incomplete / technically incorrect / missing, describe what a strong answer would contain, suggest a better answer structure, topics to study, and realistic follow-ups.",
+          "drills: exactly 3 practice drills targeting the weakest areas, each {title, how (specific steps), minutes, kind}; kind is one of dsa, lesson, quiz, system_design, project, mock, revision, resume.",
+          codeRule, commsRule, noVerdict,
+          "Return JSON with keys: summary, categories[{id,score,evidence,comment,fix}], questions[{index,...}], strengths, weaknesses, mistakes, missed_concepts, drills, code_notes, communication_comment.",
+        ].join("\n"),
+      },
+      ...context,
+    ], { temperature: 0.2, maxTokens: 9000 }));
+  } catch (e) {
+    if (process.env.AI_EVAL_NO_FALLBACK === "1") throw e;
+    // The one big call failed (busy free tier, truncated output): retry as several small calls.
+    console.info("[eval] full evaluation failed, retrying in chunks:", e instanceof Error ? e.message : e);
+    ctx.onStage?.("The free AI tier was busy — scoring in smaller pieces instead");
+    ({ data, provider, model } = await chunkedEvaluation({ iv, rubric, rubricLinesFor: (ids) => rubric.filter((r) => ids.includes(r.id)).flatMap((r) => rubricLines.slice(rubricLines.findIndex((l) => l.startsWith(`- ${r.id}:`)), rubricLines.findIndex((l) => l.startsWith(`- ${r.id}:`)) + 5)), intro, scoringRule, evidenceRule, codeRule, commsRule, noVerdict, context, hasCode: Boolean(code), onStage: ctx.onStage }));
+  }
 
   // Evidence must be real (and gets a timestamp); a category with a score but no surviving evidence is unscored.
   let dropped = 0;

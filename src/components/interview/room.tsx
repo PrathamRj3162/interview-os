@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, MicOff, Volume2, VolumeX, Pause, Play, Square, Send, Lightbulb, RotateCcw, Code2, Loader2, Keyboard, Maximize2, Minimize2, SlidersHorizontal, Gauge } from "lucide-react";
+import { CheckCircle2, Mic, MicOff, Volume2, VolumeX, Pause, Play, Square, Send, Lightbulb, RotateCcw, Code2, Loader2, Keyboard, Maximize2, Minimize2, SlidersHorizontal, Gauge } from "lucide-react";
 import Link from "next/link";
 import { Dialog } from "@/components/ui/interactive";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,11 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   });
   const { mic, tts } = voice;
   const [showVoice, setShowVoice] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+  const [stages, setStages] = useState<string[]>([]);
+  const [reportReady, setReportReady] = useState(false);
+  // Open the report once it's ready — after the spoken summary finishes, so it isn't cut off.
+  useEffect(() => { if (reportReady && !tts.speaking) router.push(`/interview/${p.id}/report`); }, [reportReady, tts.speaking, router, p.id]);
   const pastedRef = useRef(0); // characters pasted into the current answer
 
   // Clock
@@ -267,13 +272,46 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const togglePauseRef = useRef(togglePause);
   useEffect(() => { togglePauseRef.current = togglePause; });
 
+  /** Builds the report with live progress stages; returns the final status body, or null to fall back to polling. */
+  const streamComplete = async (): Promise<{ status?: string; error?: string; message?: string } | null> => {
+    const res = await fetch(`/api/interview/${p.id}/complete`, { method: "POST", headers: { Accept: "text/event-stream" } }).catch(() => null);
+    if (!res) return null;
+    if (!(res.headers.get("content-type") ?? "").includes("text/event-stream") || !res.body) return res.json().catch(() => null);
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read().catch(() => ({ value: undefined, done: true }));
+      if (done) return null;
+      buf += dec.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) >= 0) {
+        const block = buf.slice(0, sep); buf = buf.slice(sep + 2);
+        const event = /^event: (\w+)/m.exec(block)?.[1];
+        const data = JSON.parse(/^data: (.*)$/m.exec(block)?.[1] ?? "{}");
+        if (event === "stage") setStages((xs) => [...xs, data.stage]);
+        if (event === "done") return data;
+      }
+    }
+  };
+
   const end = async () => {
-    mic.stop(); tts.cancel(); setConfirmEnd(false); setEnding("evaluating"); setEndMsg(null);
+    mic.stop(); tts.cancel(); setConfirmEnd(false); setEnding("evaluating"); setEndMsg(null); setStages([]); setSummary(null);
+    // Instant spoken feedback (small, fast call) while the full report is built.
+    void fetch(`/api/interview/${p.id}/summary`, { method: "POST" }).then((r) => (r.ok ? r.json() : null)).then((d) => {
+      if (!d?.text) return;
+      setSummary(d.text);
+      if (voiceOut && tts.supported) tts.speak(d.text);
+    }).catch(() => {});
+    const first = await streamComplete();
+    if (first?.status === "completed") { setReportReady(true); return; }
+    if (first?.status === "abandoned") { setEnding("abandoned"); setEndMsg(first.message ?? "Interview ended without answers."); return; }
+    if (first?.status === "evaluation_failed") { setEnding("failed"); setEndMsg(first.error ?? "Report generation failed."); return; }
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
         const res = await fetch(`/api/interview/${p.id}/complete`, { method: "POST" });
         const data = await res.json().catch(() => ({}));
-        if (data.status === "completed") { router.push(`/interview/${p.id}/report`); return; }
+        if (data.status === "completed") { setReportReady(true); return; }
         if (data.status === "abandoned") { setEnding("abandoned"); setEndMsg(data.message ?? "Interview ended without answers."); return; }
         if (data.status === "evaluation_failed") { setEnding("failed"); setEndMsg(data.error ?? "Report generation failed."); return; }
       } catch { /* network blip: keep polling */ }
@@ -312,7 +350,28 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   if (ending) {
     return (
       <div className="mx-auto max-w-lg py-20 text-center" role="status" aria-live="polite">
-        {ending === "evaluating" && (<><Loader2 className="mx-auto size-8 animate-spin text-accent" aria-hidden /><h2 className="mt-4 text-lg font-medium">Evaluating your interview…</h2><p className="mt-2 text-sm text-muted">Scoring every answer against the rubric with evidence from your transcript. This usually takes 20–60 seconds.</p></>)}
+        {ending === "evaluating" && (
+          <>
+            {reportReady ? <CheckCircle2 className="mx-auto size-8 text-success" aria-hidden /> : <Loader2 className="mx-auto size-8 animate-spin text-accent" aria-hidden />}
+            <h2 className="mt-4 text-lg font-medium">{reportReady ? "Your report is ready" : "Building your report…"}</h2>
+            {summary && (
+              <div className="mt-4 rounded-xl border border-border bg-surface-2 p-4 text-left text-sm leading-6" data-testid="spoken-summary">
+                <p className="mb-1 text-xs font-medium text-muted">{p.personaName} — quick feedback</p>
+                <p>{summary}</p>
+              </div>
+            )}
+            <ol className="mt-4 space-y-1 text-left text-sm" aria-label="Report progress">
+              {stages.map((st, i) => (
+                <li key={i} className="flex items-center gap-2">
+                  {i < stages.length - 1 || reportReady ? <CheckCircle2 className="size-4 shrink-0 text-success" aria-hidden /> : <Loader2 className="size-4 shrink-0 animate-spin text-accent" aria-hidden />}
+                  <span className={i < stages.length - 1 || reportReady ? "text-muted" : ""}>{st}</span>
+                </li>
+              ))}
+            </ol>
+            {!stages.length && !reportReady && <p className="mt-2 text-sm text-muted">Scoring every answer against the rubric with evidence from your transcript. Usually 20–60 seconds.</p>}
+            {reportReady && <Button className="mt-6" onClick={() => router.push(`/interview/${p.id}/report`)}>View report now</Button>}
+          </>
+        )}
         {ending === "abandoned" && (<><h2 className="text-lg font-medium">Interview ended</h2><p className="mt-2 text-sm text-muted">{endMsg}</p><Button className="mt-6" onClick={() => router.push("/interview/new")}>Start a new interview</Button></>)}
         {ending === "failed" && (<><h2 className="text-lg font-medium">Report not ready</h2><p className="mt-2 text-sm text-muted">{endMsg}</p><Button className="mt-6" onClick={end}><RotateCcw className="size-4" aria-hidden /> Retry report</Button></>)}
       </div>

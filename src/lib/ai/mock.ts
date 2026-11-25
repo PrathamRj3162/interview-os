@@ -92,6 +92,10 @@ function mockReplyJson(messages: ChatMessage[], system: string): string {
 
   if (system.includes('{"hint"')) return JSON.stringify({ hint: "Consider the constraints again." });
 
+  if (system.includes("exactly 3 short sentences")) {
+    return JSON.stringify({ text: "You explained your approach clearly. The biggest thing to work on is stating complexity before you code. Next, practise two medium problems out loud." });
+  }
+
   if (system.includes("defend a software project")) {
     const repo = /Repository: ([^\s]+)/.exec(inner(last))?.[1] ?? "the repository";
     return JSON.stringify({

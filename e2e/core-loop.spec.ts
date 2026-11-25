@@ -138,6 +138,11 @@ test("interview: text mock interview → evidence-based report → tasks on dash
   await page.reload();
   await expect(page.getByRole("radio", { name: "Great" })).toHaveAttribute("aria-checked", "true");
 
+  // Instant spoken summary endpoint (small, fast call; no scores)
+  const sumRes = await page.request.post(`/api/interview/${page.url().split("/interview/")[1].split("/")[0]}/summary`);
+  expect(sumRes.ok()).toBe(true);
+  expect((await sumRes.json()).text).toMatch(/\./);
+
   // Duplicate completion is a no-op
   const id = page.url().split("/interview/")[1].split("/")[0];
   const again = await page.request.post(`/api/interview/${id}/complete`);

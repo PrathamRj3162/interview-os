@@ -35,7 +35,8 @@ const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).pa
  * Ends the interview and generates the report exactly once.
  * A conditional status update acts as a lock, so double clicks / two tabs can't create two reports.
  */
-export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const wantsStream = (req.headers.get("accept") ?? "").includes("text/event-stream");
   const { id } = await params;
   const { supabase, user } = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
@@ -64,7 +65,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
     .select("id");
   if (!lock.data?.length) return NextResponse.json({ status: "evaluating" }, { status: 202 });
 
+  // The report is built here; with `Accept: text/event-stream` the room sees real progress stages.
+  const build = async (stage: (s: string) => void): Promise<{ code: number; body: Record<string, unknown> }> => {
   try {
+    stage("Measuring timings and collecting the facts");
     // The report is not blocked by the daily quota: the candidate already invested the time.
     // DSA round: gather objective facts (judge results, hints, pastes) to ground the evaluation.
     let dsaReport: DsaReport | undefined;
@@ -118,7 +122,10 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       ].filter(Boolean).join("\n");
     }
     ctx.facts = facts;
+    ctx.onStage = stage;
+    stage("Scoring each rubric category against your transcript");
     const report = await evaluateInterview(iv, turns, ctx);
+    stage("Checking quotes and computing the verdict");
     // Paste detection in typed answers (any round): flagged for the candidate, never scored.
     const answerPastes = (await loadEvents(supabase, id)).filter((e) => e.type === "paste" && e.payload.where === "answer");
     if (answerPastes.length) report.integrity = { pastedAnswers: answerPastes.length, pastedChars: answerPastes.reduce((s, e) => s + (Number(e.payload.chars) || 0), 0) };
@@ -128,6 +135,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
       .update({ status: "completed", report, overall_score: report.overall })
       .eq("id", id).eq("user_id", user.id).eq("status", "evaluating");
     if (done.error) throw new Error("save failed");
+    stage("Adding your drills to the study plan");
 
     // Feed the study plan: each priority becomes a dated task with the reason attached.
     if (report.priorities.length) {
@@ -147,11 +155,27 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         })));
       }
     }
-    return NextResponse.json({ status: "completed" });
+    return { code: 200, body: { status: "completed" } };
   } catch (e) {
     console.error("[interview-complete]", e instanceof Error ? e.message : e);
     await own().update({ status: "evaluation_failed" }).eq("id", id).eq("user_id", user.id).eq("status", "evaluating");
     const message = e instanceof AIUnavailableError ? e.message : "Report generation failed. Your transcript is saved — you can retry.";
-    return NextResponse.json({ status: "evaluation_failed", error: message }, { status: 503 });
+    return { code: 503, body: { status: "evaluation_failed", error: message } };
   }
+  };
+
+  if (!wantsStream) {
+    const r = await build(() => {});
+    return NextResponse.json(r.body, { status: r.code });
+  }
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      const r = await build((s) => send("stage", { stage: s }));
+      send("done", r.body);
+      controller.close();
+    },
+  });
+  return new Response(stream, { headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no" } });
 }
