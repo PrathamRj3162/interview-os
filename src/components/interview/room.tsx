@@ -14,6 +14,8 @@ import { VoiceSettingsDialog, LevelMeter } from "@/components/voice/voice-ui";
 import { useDsaWorkspace, type DsaInit, type DsaWorkspace } from "@/components/dsa/use-dsa-workspace";
 import { ProblemPanel, EditorPanel, PhaseStepper, SplitPanes } from "@/components/dsa/panels";
 import type { Phase } from "@/lib/dsa/phases";
+import { boardText, type BoardElement } from "@/lib/interview/board";
+import { Whiteboard } from "./whiteboard";
 
 type Turn = { id: number; role: "interviewer" | "candidate"; content: string; code?: string | null };
 
@@ -32,6 +34,8 @@ export type RoomProps = {
   dsa?: DsaInit;
   /** Server speech-to-text (Whisper on Groq) is configured. */
   sttServer?: boolean;
+  /** System design rounds: an Excalidraw whiteboard the interviewer can read. */
+  board?: { initialElements: Record<string, unknown>[] };
 };
 
 type Net = "idle" | "thinking" | "error";
@@ -53,6 +57,10 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const [draft, setDraft] = useState("");
   const [code, setCode] = useState(() => [...p.initialTurns].reverse().find((t) => t.code)?.code ?? "");
   const [showCode, setShowCode] = useState(p.coding);
+  const boardEls = useRef<readonly BoardElement[]>([]);
+  const onBoardElements = useCallback((els: readonly BoardElement[]) => { boardEls.current = els; }, []);
+  const boardPayload = () => (p.board ? { board: boardText(boardEls.current) || null } : {});
+  const [pane, setPane] = useState<"board" | "code">("board");
   const [net, setNet] = useState<Net>("idle");
   /** The interviewer's reply while it streams in (null when nothing is streaming). */
   const [liveText, setLiveText] = useState<string | null>(null);
@@ -67,7 +75,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const [endMsg, setEndMsg] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // The coding round needs the width for three panes, so it starts in focus mode (sidebar hidden).
-  const [focusMode, setFocusMode] = useState(Boolean(ws));
+  const [focusMode, setFocusMode] = useState(Boolean(ws) || Boolean(p.board));
   const [showKeys, setShowKeys] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const spokenRef = useRef<number>(p.initialTurns.at(-1)?.id ?? 0);
@@ -250,7 +258,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
       await ws.flush(true); // the interviewer sees runs/pastes/idle that happened since its last message
       ok = await post({ action: "answer", content, code: ws.code, language: ws.language, ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
     } else {
-      ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null, ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
+      ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null, ...boardPayload(), ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
     }
     if (ok) pastedRef.current = 0;
     if (!ok && !turns.some((t) => t.role === "candidate" && t.content === content)) setDraft(content);
@@ -261,7 +269,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const retry = () => {
     const lastCandidate = [...turns].reverse().find((t) => t.role === "candidate");
     if (turns.length === 0) void post({ action: "start" });
-    else if (turns.at(-1)?.role === "candidate" && lastCandidate) void post({ action: "answer", content: lastCandidate.content, code: ws ? ws.code : lastCandidate.code ?? null, ...(ws ? { language: ws.language } : {}) });
+    else if (turns.at(-1)?.role === "candidate" && lastCandidate) void post({ action: "answer", content: lastCandidate.content, code: ws ? ws.code : lastCandidate.code ?? null, ...(ws ? { language: ws.language } : boardPayload()) });
     else void send();
   };
 
@@ -548,9 +556,23 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   return (
     <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 lg:h-[calc(100dvh-4rem)]">
       {headerEl}
-      <div className={cn("grid min-h-0 flex-1 gap-3", showCode && "lg:grid-cols-2")}>
+      <div className={cn("grid min-h-0 flex-1 gap-3", p.board ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : showCode && "lg:grid-cols-2")}>
         {transcriptEl}
-        {showCode && (
+        {p.board && (
+          <div className="flex min-h-0 flex-col gap-2">
+            {showCode && (
+              <div role="tablist" aria-label="Work area" className="flex gap-1 text-sm">
+                {(["board", "code"] as const).map((k) => (
+                  <button key={k} type="button" role="tab" aria-selected={pane === k} onClick={() => setPane(k)} className={cn("rounded-md px-3 py-1", pane === k ? "bg-accent-soft text-text" : "text-muted hover:text-text")}>{k === "board" ? "Whiteboard" : "Code"}</button>
+                ))}
+              </div>
+            )}
+            <div className={cn("min-h-0 flex-1", pane !== "board" && showCode && "hidden")}>
+              <Whiteboard interviewId={p.id} initialElements={p.board.initialElements} onElements={onBoardElements} />
+            </div>
+          </div>
+        )}
+        {showCode && (!p.board || pane === "code") && (
           <section aria-label="Code editor" className="flex min-h-48 flex-col rounded-xl border border-border bg-surface">
             <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted">
               <span className="flex items-center gap-1 font-mono">editor<span aria-hidden className="inline-block h-3.5 w-[7px] animate-[var(--animate-caret)] bg-accent" /><span className="ml-2 font-sans">sent with your next answer</span></span>

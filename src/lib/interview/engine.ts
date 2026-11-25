@@ -114,7 +114,7 @@ function historyMessages(turns: Turn[], withCode = true): ChatMessage[] {
   return turns.slice(-40).map((t) =>
     t.role === "interviewer"
       ? { role: "assistant" as const, content: t.content }
-      : { role: "user" as const, content: untrusted("candidate_answer", t.content + (withCode && t.code ? `\n\n[Code in editor]\n${t.code.slice(0, 8000)}` : "")) },
+      : { role: "user" as const, content: untrusted("candidate_answer", t.content + (withCode && t.code ? `\n\n[Code in editor]\n${t.code.slice(0, 8000)}` : "") + (t.board ? `\n\n[Whiteboard — what the candidate has drawn so far]\n${t.board}` : "")) },
   );
 }
 
@@ -369,7 +369,7 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
   const comm = communicationStats(pairs.map((p) => p.answer));
 
   const transcript = pairs.map((p) =>
-    `Q${p.index}: ${p.question}\nA${p.index}: ${p.answer}${p.code && !ctx.code ? `\n[Code]\n${p.code.slice(0, 6000)}` : ""}`,
+    `Q${p.index}: ${p.question}\nA${p.index}: ${p.answer}${p.code && !ctx.code ? `\n[Code]\n${p.code.slice(0, 6000)}` : ""}${p.board ? `\n[Whiteboard at this answer]\n${p.board.slice(0, 4000)}` : ""}`,
   ).join("\n\n");
 
   const rubricLines = rubric.flatMap((r) => {

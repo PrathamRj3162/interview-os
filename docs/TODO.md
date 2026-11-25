@@ -16,6 +16,11 @@
 - [x] Playwright E2E for every module, CI, gitleaks secret scan
 - [x] Deployed on Vercel (bom1) + Supabase (ap-south-1), migrations 0001–0009 applied
 
+## In progress — hiring-standard upgrade (approved 2026-11-25)
+- [ ] Phase A: system design v2 (content gate ✅, whiteboard, design phases, rubric v2, 24 cases, primers, estimation trainer, design fundamentals)
+- [ ] Phase B: machine coding round · [ ] C: CS fundamentals v2 · [ ] D: OA + aptitude · [ ] E: behavioural + loops · [ ] F: DSA extras · [ ] G: AI-assisted coding round
+- [ ] After A–G: report debrief upgrade — scorecard format (signal/concern/next-level bar, confidence, level estimate, advance yes/no, what wasn't measured), facts from code incl. complexity check, model answers only from verified content, validated drill links, anti-fluff linter + citation filter, two-pass auditor, 40-interview calibration set + `npm run eval:reports` (targets ≥70% exact, ≥95% within one, ≤10% over-scoring), per-round realism, honest trends + outcome logging. Plan and calibration-set outline go to the owner for approval first.
+
 ## Open
 - [ ] Resume version comparison and role-specific resume export
 - [ ] Email notifications (needs a free SMTP sender; in-app bell only for now)

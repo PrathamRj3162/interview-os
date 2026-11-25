@@ -1,8 +1,8 @@
 /** Deterministic transcript analysis (no AI): Q/A pairing, filler words, answer length, scoring maths. */
 
-export type Turn = { role: "interviewer" | "candidate"; content: string; code?: string | null };
+export type Turn = { role: "interviewer" | "candidate"; content: string; code?: string | null; board?: string | null };
 
-export type QAPair = { index: number; question: string; answer: string; code: string | null };
+export type QAPair = { index: number; question: string; answer: string; code: string | null; board?: string | null };
 
 export const isHint = (t: Turn) => t.role === "interviewer" && t.content.startsWith("[Hint]");
 
@@ -18,6 +18,7 @@ export function pairTurns(turns: Turn[]): QAPair[] {
     } else if (current) {
       current.answer = (current.answer ? current.answer + "\n" : "") + t.content;
       if (t.code) current.code = t.code;
+      if (t.board) current.board = t.board;
     }
   }
   if (current) pairs.push(current);

@@ -21,6 +21,8 @@ const bodySchema = z.discriminatedUnion("action", [
     content: z.string().trim().min(1).max(6000),
     code: z.string().max(50000).nullish(),
     language: lang,
+    /** Whiteboard as compact text (system design rounds), see lib/interview/board.ts. */
+    board: z.string().max(9000).nullish(),
     /** Characters pasted into the answer box for this answer (paste detection, flagged in the report). */
     pasted: z.number().int().min(0).max(100000).optional(),
   }),
@@ -35,8 +37,10 @@ const bodySchema = z.discriminatedUnion("action", [
   }),
 ]);
 
-const TURN_COLS = "id, role, content, code, created_at";
+const TURN_COLS = "id, role, content, code, board, created_at";
 const NUDGE_GAP_MS = 2 * 60_000;
+/** Rounds with a whiteboard. */
+const BOARD_KINDS = new Set(["hld", "lld"]);
 
 const NUDGE_TEXT = {
   idle: (d?: string) => `The candidate has been silent for a while${d ? ` (${d})` : ""} while coding.`,
@@ -70,8 +74,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let turns = turnsLoaded;
 
   const admin = createAdminClient();
-  const writeTurn = (role: "interviewer" | "candidate", content: string, code: string | null = null) =>
-    admin.from("interview_turns").insert({ interview_id: id, user_id: user.id, role, content, code }).select(TURN_COLS).single();
+  const writeTurn = (role: "interviewer" | "candidate", content: string, code: string | null = null, board: string | null = null) =>
+    admin.from("interview_turns").insert({ interview_id: id, user_id: user.id, role, content, code, board }).select(TURN_COLS).single();
   const dsa = dsaContextFor(iv);
 
   if (body.action === "start" && turns.length > 0) return NextResponse.json({ turns, phase: iv.phase }); // idempotent on reload
@@ -119,7 +123,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const [quotaError, ctx, candIns] = await Promise.all([
     assertQuota(supabase, user.id).then(() => null, (e: unknown) => e as Error),
     body.action === "hint" ? Promise.resolve(null) : loadCandidateContext(supabase, user.id, iv.resume_id, iv.project_id ?? null),
-    body.action === "answer" && !isDuplicate ? writeTurn("candidate", body.content, body.code ?? null) : Promise.resolve(null),
+    body.action === "answer" && !isDuplicate ? writeTurn("candidate", body.content, body.code ?? null, BOARD_KINDS.has(iv.kind) ? body.board?.trim() || null : null) : Promise.resolve(null),
     dsa && ws && typeof code === "string" ? saveWorkspace(supabase, id, ws) : Promise.resolve(),
     body.action === "answer" && body.pasted && body.pasted >= 80 ? logEvent(supabase, id, user.id, "paste", { chars: body.pasted, where: "answer", answerChars: body.content.length }) : Promise.resolve(),
     body.action === "nudge" ? logEvent(supabase, id, user.id, "nudge", { reason: body.reason }) : Promise.resolve(),

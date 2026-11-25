@@ -13,7 +13,7 @@ export async function loadInterview(supabase: SupabaseClient, id: string) {
 }
 
 export async function loadTurns(supabase: SupabaseClient, id: string): Promise<(Turn & { id: number; created_at: string })[]> {
-  const { data } = await supabase.from("interview_turns").select("id, role, content, code, created_at").eq("interview_id", id).order("id");
+  const { data } = await supabase.from("interview_turns").select("id, role, content, code, board, created_at").eq("interview_id", id).order("id");
   return (data ?? []) as (Turn & { id: number; created_at: string })[];
 }
 
