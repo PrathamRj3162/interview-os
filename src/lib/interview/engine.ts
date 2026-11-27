@@ -6,6 +6,7 @@ import { untrusted } from "@/lib/ai/json";
 import { PERSONAS, KINDS, KIND_FOCUS, RUBRICS, DIFFICULTIES, CHARACTERS, TIERS, type KindId, type PersonaId, type Difficulty } from "./config";
 import { pairTurns, communicationStats, type Turn } from "./analysis";
 import { anchorsFor, designLevel, isCore, weightOf, DESIGN_LEVEL_LABEL, type Anchors, type DesignLevel } from "./rubric";
+import type { ExtensionDiff, StaticFacts } from "@/lib/mc/analysis";
 import { designRedFlags, scoreCoverage, verifyDesignEvidence, type ChecklistItem, type Coverage, type RedFlag } from "./design-report";
 import { companyPrompt } from "./companies";
 import { computeVerdict, pickOneThing, type CodingFacts, type Verdict } from "./verdict";
@@ -29,6 +30,39 @@ export type DesignPrompt = {
   curveball?: string;
   boardEmpty: boolean;
 };
+
+/** Machine coding round: the problem, the server-driven phase, and the candidate's saved files. */
+export type McPrompt = {
+  title: string; statement: string[]; io: string[]; core: string[]; bonus: string[];
+  extension?: { title: string; text: string[]; io: string[] };
+  phase: "build" | "review" | "wrap"; minutesLeftInPhase: number; language: string;
+  files: string; lastSubmit: string | null; facts: string[];
+};
+
+function mcSection(m: McPrompt) {
+  return [
+    "",
+    "MACHINE CODING ROUND — the candidate builds a working command-line app in " + m.language + "; you see their saved files and their test results.",
+    `Problem: ${m.title}. ${m.statement.join(" ")}`,
+    `I/O contract: ${m.io.join(" | ")}`,
+    `Core requirements: ${m.core.join("; ")}. Bonus: ${m.bonus.join("; ")}.`,
+    m.extension ? `EXTENSION (already shown to the candidate): ${m.extension.title} — ${m.extension.text.join(" ")} ${m.extension.io.join(" ")}` : "The extension has NOT been revealed yet — never mention or hint at it.",
+    m.phase === "build"
+      ? `CURRENT PHASE: BUILD (about ${Math.max(1, Math.round(m.minutesLeftInPhase))} min left). Act as the product owner: answer questions about the requirements briefly and exactly (use the I/O contract; don't invent new behaviour). Do not design, review or write code for them during the build. If they ask a design question, ask what they think. Keep replies to one or two sentences.`
+      : `CURRENT PHASE: CODE REVIEW (the build is over; the code is frozen). Ask ONE question at a time about THEIR code, naming their files/classes: why it's split this way; where the extension went and what else had to change; how a further requirement would fit; validation and error handling; how they'd unit test the core logic${m.facts.length ? "; anything notable in the facts below" : ""}. Probe answers that don't match the code.`,
+  ].filter(Boolean).join("\n");
+}
+
+function mcWorkspaceMessage(m: McPrompt): ChatMessage {
+  return {
+    role: "user",
+    content: untrusted("workspace", [
+      `[Saved files — ${m.language}]`, m.files || "(empty)",
+      "", "[Latest submit to the hidden tests]", m.lastSubmit ?? "(not submitted yet)",
+      ...(m.facts.length ? ["", "[Facts computed from the code]", ...m.facts.map((f) => `- ${f}`)] : []),
+    ].join("\n")),
+  };
+}
 
 function designSection(d: DesignPrompt) {
   return [
@@ -87,7 +121,7 @@ function dsaSection(iv: InterviewRow, d: DsaPrompt) {
   ].filter(Boolean).join("\n");
 }
 
-function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean, dsa?: DsaPrompt, design?: DesignPrompt) {
+function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean, dsa?: DsaPrompt, design?: DesignPrompt, mc?: McPrompt) {
   const persona = PERSONAS[iv.persona] ?? PERSONAS.professional;
   const lines = [
     `You are ${CHARACTERS[iv.persona]?.first ?? "the interviewer"}, a "${persona.name}" (interviewer tier: ${TIERS[CHARACTERS[iv.persona]?.tier ?? "standard"].label}), conducting a ${KINDS[iv.kind].name} for a ${ctx.role ?? "software engineer"} candidate (${ctx.experience ?? "unknown experience"}).`,
@@ -121,6 +155,7 @@ function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: numb
   ];
   if (dsa) lines.push(dsaSection(iv, dsa));
   if (design) lines.push(designSection(design));
+  if (mc) lines.push(mcSection(mc));
 
   const facts: string[] = [];
   if (ctx.claims.length && ["resume_screen", "project", "full", "company", "behavioral"].includes(iv.kind)) {
@@ -164,13 +199,14 @@ function workspaceMessage(d: DsaPrompt): ChatMessage {
  * An optional `nudge` describes something the candidate did (silence, a failed run, a paste) that the
  * interviewer should react to without waiting for the candidate to speak.
  */
-export async function streamInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa: DsaPrompt | undefined, onSay: (text: string) => void, nudge?: string, design?: DesignPrompt) {
+export async function streamInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa: DsaPrompt | undefined, onSay: (text: string) => void, nudge?: string, design?: DesignPrompt, mc?: McPrompt) {
   const isFirst = turns.length === 0;
   const messages: ChatMessage[] = [
-    { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst, dsa, design) },
+    { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst, dsa, design, mc) },
     ...historyMessages(turns, !dsa),
   ];
   if (dsa) messages.push(workspaceMessage(dsa));
+  if (mc) messages.push(mcWorkspaceMessage(mc));
   if (isFirst) messages.push({ role: "user", content: "(The candidate has joined. Begin the interview.)" });
   if (nudge) messages.push({ role: "user", content: `(No message from the candidate — something happened in the room: ${nudge} React to it briefly, the way a real interviewer would: one short question or prompt. ${iv.mode === "mock" ? "Mock mode: a probing question only — never a hint, never the approach." : "Practice mode: a gentle prompt; no full solutions."})` });
   const r = await streamChat(messages, { temperature: 0.6, maxTokens: 900 }, spokenFilter(onSay));
@@ -301,6 +337,8 @@ export type InterviewReport = {
   provider: string; model: string;
   /** DSA live-coding round: objective facts from the judge and the room (computed in code, not by AI). */
   dsa?: DsaReport;
+  /** Machine coding round: tests, extensibility diff and static facts (all computed in code). */
+  mc?: McReport;
   /** System design round v2: level, checklist coverage from verified evidence, red flags, curveball. */
   design?: DesignReport;
   /** Rubric version, so trends only compare like with like. */
@@ -332,7 +370,21 @@ export type DesignReport = {
   board?: string;
 };
 
+export type McReport = {
+  problem: { slug: string; title: string };
+  language: string;
+  submits: number;
+  /** Final submit's results (null = never submitted). */
+  tests: { core: { passed: number; total: number }; ext: { passed: number; total: number }; revealed: boolean } | null;
+  revealedAtMin: number | null;
+  diff: ExtensionDiff | null;
+  facts: StaticFacts;
+  files: Record<string, string>;
+};
+
 export type EvaluationContext = {
+  /** Machine coding: scores measured in code, categories that don't apply, and the round facts for the report. */
+  mc?: { completeness: { score: number | null; evidence: string }; extensibility: { score: number | null; evidence: string }; exclude: string[]; report: McReport };
   /** System design: the case checklist and round facts. */
   design?: { case?: { slug: string; title: string }; checklist: ChecklistItem[]; curveball?: string; phasesReached: string[] };
   /** Objective facts for the evaluator (judge results, hints, editor events). */
@@ -422,7 +474,7 @@ type TimedTurnRow = Turn & { created_at?: string };
 
 export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[], ctx: EvaluationContext): Promise<InterviewReport> {
   const pairs = pairTurns(turns);
-  const rubric = RUBRICS[iv.kind];
+  const rubric = RUBRICS[iv.kind].filter((r) => !ctx.mc?.exclude.includes(r.id));
   const candTurns = turns.filter((t) => t.role === "candidate").map((t) => ({ content: t.content, board: t.board ?? null, created_at: t.created_at ?? iv.started_at }));
   const isDesign = iv.kind === "hld";
   const level = designLevel(iv.difficulty);
@@ -497,6 +549,10 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
     const c = data.categories.find((x) => x.id === r.id);
     const anchors = anchorsOf(r.id);
     const base = { ...r, core: isCore(iv.kind, r.id), weight: weightOf(iv.kind, r.id), anchors, comment: c?.comment ?? "", fix: c?.fix ?? "" };
+    const measured = ctx.mc && (r.id === "completeness" || r.id === "extensibility") ? ctx.mc[r.id] : null;
+    if (measured) {
+      return { ...base, score: measured.score, anchor: measured.score ? anchors[measured.score - 1] : null, evidence: [{ text: measured.evidence, at: null }], source: "judge" as const };
+    }
     if (iv.kind === "dsa" && r.id === "correctness" && judged) {
       return { ...base, score: judged.score, anchor: anchors[judged.score - 1], evidence: [{ text: judged.evidence, at: null }], source: "judge" as const };
     }
@@ -561,5 +617,6 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
     evidence_dropped: dropped,
     provider, model,
     ...(design ? { design, rubric: "hld-v2" as const } : {}),
+    ...(ctx.mc ? { mc: ctx.mc.report } : {}),
   };
 }

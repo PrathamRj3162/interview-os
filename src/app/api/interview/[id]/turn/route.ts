@@ -3,7 +3,10 @@ import { z } from "zod";
 import { getCurrentUser, createAdminClient } from "@/lib/supabase/server";
 import { AIUnavailableError } from "@/lib/ai";
 import { assertQuota, recordUsage, QuotaExceededError } from "@/lib/ai/quota";
-import { streamInterviewerTurn, practiceHint, type DsaPrompt, type DesignPrompt } from "@/lib/interview/engine";
+import { streamInterviewerTurn, practiceHint, type DsaPrompt, type DesignPrompt, type McPrompt } from "@/lib/interview/engine";
+import { advanceMc, filesAsText, mcContextFor, type McWorkspace } from "@/lib/mc/server";
+import { describeFacts, staticFacts } from "@/lib/mc/analysis";
+import { MC_LANG_LABEL } from "@/lib/mc/types";
 import { loadInterview, loadTurns, loadCandidateContext, minutesLeft } from "@/lib/interview/server";
 import { PERSONAS, CHARACTERS, type PersonaId } from "@/lib/interview/config";
 import { PHASES, PHASE_GOALS, PHASE_LABELS, nextPhase, codeLinesBeyondStarter, lineDiff, type Phase } from "@/lib/dsa/phases";
@@ -90,6 +93,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 
   // DSA opening and hints are deterministic: no AI call, no quota, written in advance.
+  // Machine coding: a fixed opening (no AI call), like the DSA round.
+  const mcCtx = mcContextFor(iv);
+  if (mcCtx && body.action === "start") {
+    const { data: prof } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+    const name = prof?.full_name?.split(" ")[0];
+    const { plan } = mcCtx;
+    const opening = `Hi${name ? ` ${name}` : ""}, I'm ${CHARACTERS[iv.persona as PersonaId]?.first ?? "your interviewer"}. Today's machine coding problem is "${mcCtx.problem.title}" — the requirements are on your screen. You have ${plan.buildMin} minutes to build a working command-line app; about ${plan.revealAtMin} minutes in, I'll add one more requirement. Treat me as the product owner: ask me anything about the requirements as you go. After the build we'll spend ${plan.reviewMin} minutes reviewing your code together.`;
+    const ins = await writeTurn("interviewer", opening);
+    if (ins.error) return NextResponse.json({ error: "Could not start the interview." }, { status: 500 });
+    return NextResponse.json({ turns: [ins.data], phase: "build" });
+  }
+
   if (dsa && body.action === "start") {
     const name = (await loadCandidateContext(supabase, user.id, null)).name?.split(" ")[0];
     const opening = `Hi${name ? ` ${name}` : ""}, I'm ${CHARACTERS[iv.persona as PersonaId]?.first ?? "your interviewer"}${PERSONAS[iv.persona] ? `, your ${PERSONAS[iv.persona].name}` : ""} today. We'll work through one problem: "${dsa.problem.title}". It's on your screen now. Take a minute to read it, then tell me in your own words what it's asking, and ask anything you'd like clarified. Please think out loud as you go — you can run your code against the examples whenever you like.`;
@@ -214,6 +229,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       boardEmpty: !lastBoard,
     };
   }
+  let mcPrompt: McPrompt | undefined;
+  if (mcCtx) {
+    const prog = await advanceMc(supabase, iv);
+    const mws = iv.workspace as McWorkspace | null;
+    const files = mws?.files ?? {};
+    const { data: lastSub } = await supabase.from("submissions").select("results, created_at").eq("interview_id", id).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const s = lastSub?.results as { status?: string; core?: { passed: number; total: number }; ext?: { passed: number; total: number }; firstFailure?: { name: string } | null } | null;
+    mcPrompt = {
+      title: mcCtx.problem.title, statement: mcCtx.problem.statement, io: mcCtx.problem.io, core: mcCtx.problem.core, bonus: mcCtx.problem.bonus,
+      ...(prog.revealed ? { extension: mcCtx.problem.extension } : {}),
+      phase: prog.phase, language: MC_LANG_LABEL[mws?.language ?? "java"],
+      minutesLeftInPhase: prog.phase === "build" ? prog.plan.buildMin - prog.elapsedMin : iv.duration_min - prog.elapsedMin,
+      files: filesAsText(files),
+      lastSubmit: s ? `${s.status}: core ${s.core?.passed}/${s.core?.total}${s.ext?.total ? `, extension ${s.ext.passed}/${s.ext.total}` : ""}${s.firstFailure ? `; first failing test: ${s.firstFailure.name}` : ""}` : null,
+      facts: prog.phase === "build" ? [] : describeFacts(staticFacts(files, mws?.language ?? "java", { concurrency: mcCtx.problem.concurrency }), mcCtx.problem.concurrency),
+    };
+  }
   const nudge = body.action === "nudge" ? NUDGE_TEXT[body.reason](body.detail) : undefined;
 
   const enc = new TextEncoder();
@@ -222,7 +254,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       let firstAt = 0;
       try {
-        const r = await streamInterviewerTurn(iv, ctx!, turns, left, prompt, (text) => { if (!firstAt) firstAt = Date.now(); send("delta", { text }); }, nudge, design);
+        const r = await streamInterviewerTurn(iv, ctx!, turns, left, prompt, (text) => { if (!firstAt) firstAt = Date.now(); send("delta", { text }); }, nudge, design, mcPrompt);
         if (dsa && ws && r.data.advance_phase) { const post = signals(true); movePhase(post.phase, post.reason); }
         if (design && r.data.advance_phase) { const post = designStep(true); moveDesign(post.phase, post.reason); }
         const [ins] = await Promise.all([
@@ -233,7 +265,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (ins.error) { send("error", { error: "Could not save the interviewer's reply.", turns, retryable: true }); return; }
         const timing = { prepMs, firstTokenMs: firstAt ? firstAt - t0 : null, totalMs: Date.now() - t0 };
         console.info(`[turn] ${JSON.stringify(timing)}`);
-        send("done", { turns: [...turns, ins.data], shouldEnd: r.data.should_end, phase: dsa ? phase : dPhase ?? undefined, minutesLeft: left, timing });
+        send("done", { turns: [...turns, ins.data], shouldEnd: r.data.should_end, phase: dsa ? phase : dPhase ?? mcPrompt?.phase ?? undefined, minutesLeft: left, timing });
       } catch (e) {
         const msg = e instanceof QuotaExceededError || e instanceof AIUnavailableError
           ? e.message

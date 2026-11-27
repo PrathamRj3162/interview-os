@@ -17,6 +17,7 @@ import type { Phase } from "@/lib/dsa/phases";
 import { boardText, type BoardElement } from "@/lib/interview/board";
 import { DESIGN_PHASES, DESIGN_PHASE_LABELS, type DesignPhase } from "@/lib/interview/design-phases";
 import { Whiteboard } from "./whiteboard";
+import { McWorkspace, type McInit } from "@/components/mc/mc-workspace";
 
 type Turn = { id: number; role: "interviewer" | "candidate"; content: string; code?: string | null };
 
@@ -37,6 +38,8 @@ export type RoomProps = {
   sttServer?: boolean;
   /** System design rounds: an Excalidraw whiteboard the interviewer can read. */
   board?: { initialElements: Record<string, unknown>[] };
+  /** Machine coding round: problem, files and the server-driven build/review clock. */
+  mc?: McInit;
   /** System design (HLD) round: the server-driven phase, shown as a stepper. */
   designPhase?: string | null;
 };
@@ -80,7 +83,10 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const [endMsg, setEndMsg] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   // The coding round needs the width for three panes, so it starts in focus mode (sidebar hidden).
-  const [focusMode, setFocusMode] = useState(Boolean(ws) || Boolean(p.board));
+  const [focusMode, setFocusMode] = useState(Boolean(ws) || Boolean(p.board) || Boolean(p.mc));
+  // Machine coding: unsaved edits are flushed before every answer so the interviewer reads the latest code.
+  const mcFlush = useRef<(() => Promise<void>) | null>(null);
+  const registerMcFlush = useCallback((fn: () => Promise<void>) => { mcFlush.current = fn; }, []);
   const [showKeys, setShowKeys] = useState(false);
   const listRef = useRef<HTMLOListElement>(null);
   const spokenRef = useRef<number>(p.initialTurns.at(-1)?.id ?? 0);
@@ -263,7 +269,8 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
       await ws.flush(true); // the interviewer sees runs/pastes/idle that happened since its last message
       ok = await post({ action: "answer", content, code: ws.code, language: ws.language, ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
     } else {
-      ok = await post({ action: "answer", content, code: showCode && code.trim() ? code : null, ...boardPayload(), ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
+      if (p.mc) await mcFlush.current?.();
+      ok = await post({ action: "answer", content, code: !p.mc && showCode && code.trim() ? code : null, ...boardPayload(), ...(pastedRef.current ? { pasted: pastedRef.current } : {}) });
     }
     if (ok) pastedRef.current = 0;
     if (!ok && !turns.some((t) => t.role === "candidate" && t.content === content)) setDraft(content);
@@ -562,8 +569,9 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
     <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 lg:h-[calc(100dvh-4rem)]">
       {headerEl}
       {isDesign && <DesignStepper phase={designPhase} />}
-      <div className={cn("grid min-h-0 flex-1 gap-3", p.board ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : showCode && "lg:grid-cols-2")}>
+      <div className={cn("grid min-h-0 flex-1 gap-3", p.board || p.mc ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : showCode && "lg:grid-cols-2")}>
         {transcriptEl}
+        {p.mc && <McWorkspace interviewId={p.id} init={p.mc} registerFlush={registerMcFlush} />}
         {p.board && (
           <div className="flex min-h-0 flex-col gap-2">
             {showCode && (
@@ -578,7 +586,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
             </div>
           </div>
         )}
-        {showCode && (!p.board || pane === "code") && (
+        {showCode && !p.mc && (!p.board || pane === "code") && (
           <section aria-label="Code editor" className="flex min-h-48 flex-col rounded-xl border border-border bg-surface">
             <div className="flex items-center justify-between border-b border-border px-3 py-2 text-xs text-muted">
               <span className="flex items-center gap-1 font-mono">editor<span aria-hidden className="inline-block h-3.5 w-[7px] animate-[var(--animate-caret)] bg-accent" /><span className="ml-2 font-sans">sent with your next answer</span></span>

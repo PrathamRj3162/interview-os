@@ -41,9 +41,10 @@ export default async function SystemDesignPage() {
         <h1 className="text-2xl font-semibold tracking-tight">System design lab</h1>
         <p className="text-sm text-muted">Case studies with a reference design you can reveal step by step after trying it yourself — then practise the same case out loud with the architect interviewer.</p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-3" data-testid="lab-tools">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="lab-tools">
         <Link href="/system-design/primers" className="block rounded-[var(--radius-lg)]"><Card className="h-full p-4 transition-colors hover:border-accent/60"><p className="font-medium">Building blocks</p><p className="mt-1 text-xs text-muted">Caching, sharding, queues, consistency and more — each with a 30-second interview answer and a quick check.</p></Card></Link>
         <Link href="/system-design/drill" className="block rounded-[var(--radius-lg)]"><Card className="h-full p-4 transition-colors hover:border-accent/60"><p className="font-medium">Design fundamentals drill</p><p className="mt-1 text-xs text-muted">Five scenario questions in 15 minutes (&ldquo;the page is slow at peak — what do you check?&rdquo;), graded on key points.</p></Card></Link>
+        <Link href="/system-design/lld" className="block rounded-[var(--radius-lg)]"><Card className="h-full p-4 transition-colors hover:border-accent/60"><p className="font-medium">LLD lab</p><p className="mt-1 text-xs text-muted">SOLID before and after, ten patterns with when interviewers expect them, and Java concurrency.</p></Card></Link>
         <Link href="/system-design/estimation" className="block rounded-[var(--radius-lg)]"><Card className="h-full p-4 transition-colors hover:border-accent/60"><p className="font-medium">Estimation trainer</p><p className="mt-1 text-xs text-muted">Back-of-the-envelope drills (QPS, peak, storage, bandwidth) graded instantly, with worked steps.</p></Card></Link>
       </div>
       {section("hld", "High-level design", HLD_FRAMEWORK)}

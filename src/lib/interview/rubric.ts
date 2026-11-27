@@ -9,6 +9,43 @@ import type { KindId } from "./config";
 export type Anchors = [string, string, string, string];
 
 export const ANCHORS: Record<string, Anchors> = {
+  // Machine coding (completeness and extensibility are scored from tests and the diff; see lib/mc/scoring.ts)
+  completeness: [
+    "Most core requirements don't work (under 40% of the core tests pass) or the code doesn't compile.",
+    "Some core requirements work (40–74% of the core tests).",
+    "Nearly all core requirements work (75–99% of the core tests).",
+    "Every core requirement works (all core tests pass).",
+  ],
+  modularity: [
+    "One or two god classes mixing parsing, rules and state.",
+    "Some separation, but core logic is tangled with I/O or spread inconsistently.",
+    "Clear classes with single responsibilities; I/O separated from the domain.",
+    "Clean domain model with interfaces where variation is expected; each class easy to explain.",
+  ],
+  validation: [
+    "Bad input crashes the program or corrupts state.",
+    "Some checks, inconsistently applied.",
+    "Inputs validated at the boundaries with clear errors.",
+    "Validation and error handling are deliberate and consistent everywhere, including state-dependent errors.",
+  ],
+  concurrency: [
+    "Shared mutable state with no protection, and no awareness of the problem.",
+    "Aware of the risk but the protection is missing or wrong.",
+    "Critical sections protected (locks/atomics/concurrent collections) with a sound explanation.",
+    "Correct, minimal synchronisation with a clear argument about races and contention.",
+  ],
+  readability: [
+    "Hard to follow: unclear names, very long methods.",
+    "Readable in parts; some long methods or unclear names.",
+    "Clear names and reasonably small methods throughout.",
+    "Reads like documentation: consistent, small, well-named pieces.",
+  ],
+  testability: [
+    "Logic can only be exercised through the console loop.",
+    "Some logic is separable, but key rules depend on I/O or globals.",
+    "Domain logic is independent of I/O and could be unit tested directly.",
+    "Designed for tests: pure domain services, injectable dependencies (clocks, strategies).",
+  ],
   // DSA
   understanding: [
     "Started without understanding the problem, or misread it.",
@@ -353,9 +390,21 @@ export const HLD_ANCHORS: Record<string, Record<DesignLevel, Anchors>> = {
   },
 };
 
-/** The anchors used to score a category. HLD categories use the level-calibrated v2 sets. */
+/** Machine-coding meanings for ids that other rounds also use. */
+export const MC_ANCHORS: Record<string, Anchors> = {
+  extensibility: [
+    "The new requirement wasn't delivered (under half its tests pass).",
+    "Partly delivered, or it needed broad changes across the code.",
+    "Delivered with moderate, mostly local changes.",
+    "Delivered with small, local changes (a new class or strategy, few existing lines touched).",
+  ],
+};
+
+/** The anchors used to score a category. HLD uses the level-calibrated v2 sets; machine coding has its own for shared ids. */
 export const anchorsFor = (id: string, opts?: { kind?: KindId; level?: DesignLevel }): Anchors =>
-  (opts?.kind === "hld" && HLD_ANCHORS[id] ? HLD_ANCHORS[id][opts.level ?? "sde1"] : undefined) ?? ANCHORS[id] ?? GENERIC;
+  (opts?.kind === "hld" && HLD_ANCHORS[id] ? HLD_ANCHORS[id][opts.level ?? "sde1"] : undefined)
+  ?? (opts?.kind === "machine_coding" ? MC_ANCHORS[id] : undefined)
+  ?? ANCHORS[id] ?? GENERIC;
 
 /** The categories that matter most for each round: they count double and gate the verdict. */
 export const CORE: Record<KindId, string[]> = {
@@ -369,6 +418,7 @@ export const CORE: Record<KindId, string[]> = {
   hr: ["motivation", "self_awareness"],
   full: ["problem_solving", "technical_depth"],
   company: ["problem_solving", "technical_depth"],
+  machine_coding: ["completeness", "extensibility"],
 };
 
 export const isCore = (kind: KindId, id: string) => (CORE[kind] ?? []).includes(id);

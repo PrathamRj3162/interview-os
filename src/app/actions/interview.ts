@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { CASE_BY_SLUG, designMeta } from "@/lib/learn/design";
 import { loadGate } from "@/lib/content/gate";
+import { MC_BY_SLUG, MC_PROBLEMS } from "@/lib/mc/problems";
+import { initialMcWorkspace } from "@/lib/mc/server";
+import { mcMeta, MC_DURATIONS } from "@/lib/mc/meta";
 import { requireUser, getCurrentUser } from "@/lib/supabase/server";
 import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS } from "@/lib/interview/config";
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
@@ -18,7 +21,7 @@ const schema = z.object({
   kind: z.enum(keys(KINDS)),
   persona: z.enum(keys(PERSONAS)),
   difficulty: z.enum(keys(DIFFICULTIES)),
-  duration_min: z.coerce.number().refine((n) => (DURATIONS as readonly number[]).includes(n), "Pick a duration"),
+  duration_min: z.coerce.number().refine((n) => (DURATIONS as readonly number[]).includes(n) || (MC_DURATIONS as readonly number[]).includes(n), "Pick a duration"),
   mode: z.enum(["mock", "practice"]),
   input_mode: z.enum(["text", "voice"]),
   language: z.enum(keys(LANGUAGES)).nullable(),
@@ -30,6 +33,8 @@ const schema = z.object({
   /** System design lab case this round is about (links the round to its checklist and curveballs). */
   design_case: z.string().refine((s) => s in CASE_BY_SLUG, "Unknown case").nullable(),
   project_id: z.uuid().nullable(),
+  /** Machine coding problem (bank slug). */
+  mc_problem: z.string().refine((s) => s in MC_BY_SLUG, "Unknown problem").nullable(),
 });
 
 export async function createInterview(_: ActionState, fd: FormData): Promise<ActionState> {
@@ -40,7 +45,7 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
     duration_min: fd.get("duration_min"), mode: fd.get("mode"), input_mode: fd.get("input_mode"),
     language: blank(fd.get("language")), company: blank(fd.get("company")), resume_id: blank(fd.get("resume_id")),
     problem_slug: blank(fd.get("problem_slug")),
-    topic: blank(fd.get("topic")), project_id: blank(fd.get("project_id")), design_case: blank(fd.get("design_case")),
+    topic: blank(fd.get("topic")), project_id: blank(fd.get("project_id")), design_case: blank(fd.get("design_case")), mc_problem: blank(fd.get("mc_problem")),
   });
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues), message: "Please check the highlighted options." };
 
@@ -59,6 +64,23 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
   // A case only applies to design rounds of the same kind; the HLD round starts in its first phase.
   if (fields.design_case && (CASE_BY_SLUG[fields.design_case].kind !== fields.kind || !(await loadGate()).visible(designMeta(CASE_BY_SLUG[fields.design_case])))) row.design_case = null;
   if (fields.kind === "hld") row.phase = "requirements";
+  if (fields.kind !== "machine_coding") row.mc_problem = null;
+  else if (!(MC_DURATIONS as readonly number[]).includes(fields.duration_min)) return { fieldErrors: { duration_min: "Machine coding runs 60 or 110 minutes." }, message: "Please check the highlighted options." };
+  else {
+    // Machine coding: the chosen problem if the user can see it, otherwise a random visible one; the workspace starts
+    // from a minimal entry file in their language.
+    const gate = await loadGate();
+    const visible = MC_PROBLEMS.filter((p) => gate.visible(mcMeta(p)));
+    if (!visible.length) return { message: "Machine coding problems are still being reviewed. Try again soon." };
+    const pick = fields.mc_problem && visible.some((p) => p.slug === fields.mc_problem) ? fields.mc_problem : visible[Math.floor(Math.random() * visible.length)].slug;
+    let language = parsed.data.language;
+    if (!language) {
+      const { data: prof } = await supabase.from("profiles").select("preferred_language").eq("id", user.id).maybeSingle();
+      language = prof?.preferred_language ?? "java";
+    }
+    const ws = initialMcWorkspace(language);
+    Object.assign(row, { mc_problem: pick, phase: "build", language: ws.language, workspace: ws });
+  }
 
   // The DSA round gets one problem from the bank: the chosen one, or a random fresh one at this difficulty.
   if (parsed.data.kind === "dsa") {

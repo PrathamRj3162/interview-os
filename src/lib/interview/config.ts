@@ -85,6 +85,7 @@ export const KINDS = {
   hr: { name: "HR screening", defaultPersona: "hr", coding: false },
   full: { name: "Complete SDE mock interview", defaultPersona: "professional", coding: true },
   company: { name: "Company-style mock", defaultPersona: "bar_raiser", coding: true },
+  machine_coding: { name: "Machine coding", defaultPersona: "strict", coding: true },
 } as const;
 export type KindId = keyof typeof KINDS;
 
@@ -177,6 +178,18 @@ export const RUBRICS: Record<KindId, { id: string; name: string; desc: string }[
     { id: "ownership", name: "Ownership & judgement", desc: "Takes responsibility; sound decisions" },
     { id: "communication", name: "Communication", desc: "Clear, structured, concise" },
   ],
+  // Machine coding: completeness and extensibility come from tests and the diff (computed in code).
+  machine_coding: [
+    { id: "completeness", name: "Functional completeness", desc: "Core requirements work end to end (hidden tests)" },
+    { id: "extensibility", name: "Extensibility", desc: "The minute-60 requirement fitted in with small, local changes (diff + tests)" },
+    { id: "correctness", name: "Correctness & edge cases", desc: "Behaves correctly on edge cases and bad input" },
+    { id: "modularity", name: "Modularity", desc: "Clear classes with single responsibilities; no god class" },
+    { id: "validation", name: "Error handling & validation", desc: "Inputs validated; errors handled deliberately" },
+    { id: "concurrency", name: "Concurrency", desc: "Shared state is safe under concurrent access (only when the problem needs it)" },
+    { id: "readability", name: "Readability", desc: "Naming, structure and small methods" },
+    { id: "testability", name: "Testability", desc: "Logic separated from I/O so it can be unit tested" },
+    { id: "communication", name: "Communication in the review", desc: "Explained choices and trade-offs clearly in the review" },
+  ],
 };
 
 export const KIND_FOCUS: Record<KindId, string> = {
@@ -190,4 +203,5 @@ export const KIND_FOCUS: Record<KindId, string> = {
   hr: "HR screening: introductions, motivation, career goals, strengths/weaknesses, expectations and logistics.",
   full: "A compressed full loop: brief intro, one resume/project probe, one DSA problem, a few CS fundamentals questions, and one behavioral question.",
   company: "A company-style loop for the stated target company: emphasise the values and bar that company is publicly known for, but never claim a question was actually asked there.",
+  machine_coding: "Machine coding: a 90-minute build of a working, modular command-line app from a requirements doc, then a code review. During the build act as the product owner: answer clarifying questions about the requirements briefly and precisely, never design or write code for the candidate, and otherwise stay quiet. In the review, read their code and ask about design choices, extensibility, validation and (only if the problem needs it) concurrency.",
 };

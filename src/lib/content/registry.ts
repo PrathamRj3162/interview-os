@@ -3,6 +3,11 @@ import { DESIGN_CASES, designMeta } from "@/lib/learn/design";
 import { DESIGN_DIAGRAMS } from "@/lib/learn/design-diagrams";
 import { PRIMERS, primerMeta, type Primer } from "@/lib/learn/primers";
 import { ESTIMATION_META, makeDrill } from "@/lib/learn/estimation";
+import { MC_PROBLEMS } from "@/lib/mc/problems";
+import { LLD_LESSONS, lldLessonMeta } from "@/lib/learn/lld-lessons";
+import { MC_TEST_INPUTS } from "@/lib/mc/test-inputs";
+import { mcMeta } from "@/lib/mc/meta";
+import MC_EXPECTED from "@/lib/mc/expected.json";
 import { DESIGN_QUESTIONS, designQuestionMeta } from "@/lib/learn/design-questions";
 
 /**
@@ -35,6 +40,17 @@ function estimationChecks(): ContentCheck[] {
   return [has("Templates produce valid drills (200 seeds)", ok, "A template produced an invalid answer")];
 }
 
+function mcChecks(p: (typeof MC_PROBLEMS)[number]): ContentCheck[] {
+  const tests = MC_TEST_INPUTS[p.slug] ?? [];
+  const exp = (MC_EXPECTED as Record<string, { sample: string; tests: Record<string, string> } | undefined>)[p.slug];
+  return [
+    has("Statement, I/O contract, core and bonus", p.statement.length > 0 && p.io.length >= 2 && p.core.length >= 2 && p.bonus.length >= 1, "Incomplete statement"),
+    has("Minute-60 extension", p.extension.io.length >= 1 && p.extension.text.length >= 1, "Missing extension"),
+    has("Hidden tests (≥3 core, ≥1 extension)", tests.filter((t) => !t.ext).length >= 3 && tests.some((t) => t.ext), "Not enough tests"),
+    has("Reference outputs generated (sample matches the statement)", Boolean(exp) && exp!.sample === p.sample.output.replace(/\s+$/gm, "").trim() && tests.every((t) => typeof exp!.tests[t.name] === "string"), "Run scripts/mc-expected.mts"),
+  ];
+}
+
 function primerChecks(p: Primer): ContentCheck[] {
   const words = p.answer30.split(/\s+/).length;
   return [
@@ -50,6 +66,13 @@ export function allContent(): RegistryItem[] {
     ...DESIGN_QUESTIONS.map((x) => ({ meta: designQuestionMeta(x), title: x.q, href: "/system-design/drill", checks: [
       has("4–6 key points with unique ids", x.keyPoints.length >= 4 && x.keyPoints.length <= 6 && new Set(x.keyPoints.map((p) => p.id)).size === x.keyPoints.length, "Needs 4–6 key points with unique ids"),
       has("Question is a scenario", x.q.length >= 40 && x.q.trim().endsWith("?"), "Should be a full scenario question"),
+    ] })),
+    ...MC_PROBLEMS.map((p) => ({ meta: mcMeta(p), title: `Machine coding: ${p.title}`, href: `/interview/new?kind=machine_coding&mc=${p.slug}`, checks: mcChecks(p) })),
+    ...LLD_LESSONS.map((l) => ({ meta: lldLessonMeta(l), title: `LLD: ${l.title}`, href: `/system-design/lld/${l.slug}`, checks: [
+      has("When an interviewer expects it", l.expect.length >= 2, "Needs ≥2 situations"),
+      has("Content with code", l.sections.length >= 1 && l.sections.some((s) => s.code || (s.before && s.after)) || l.group === "principles", "Needs at least one code sketch"),
+      has("Traps", l.pitfalls.length >= 2, "Needs ≥2 traps"),
+      has("Linked cases exist", l.cases.length >= 1 && l.cases.every((s) => DESIGN_CASES.some((c) => c.slug === s)), `Unknown case in: ${l.cases.join(", ")}`),
     ] })),
     { meta: ESTIMATION_META, title: "Estimation trainer (drill templates)", href: "/system-design/estimation", checks: estimationChecks() },
     ...PRIMERS.map((p) => ({ meta: primerMeta(p), title: p.title, href: `/system-design/primers/${p.slug}`, checks: primerChecks(p) })),

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { InterviewRoom } from "@/components/interview/room";
+import { mcContextFor, type McWorkspace } from "@/lib/mc/server";
 import { requireUser } from "@/lib/supabase/server";
 import { loadInterview, loadTurns } from "@/lib/interview/server";
 import { KINDS, PERSONAS, CHARACTERS } from "@/lib/interview/config";
@@ -24,10 +25,18 @@ export default async function InterviewRoomPage({ params }: { params: Promise<{ 
     const hintsUsed = (await loadEvents(supabase, id)).filter((e) => e.type === "hint").length;
     dsaInit = { problem: { ...dsa.problem, hasStress: dsa.problem.slug in STRESS }, phase: asPhase(iv.phase), language: ws.language, code: ws.code, hintsUsed };
   }
+  // Machine coding: the problem statement is client-safe; hidden tests stay on the server.
+  const mcCtx = mcContextFor(iv);
+  const mcWs = iv.workspace as McWorkspace | null;
+  const mcInit = mcCtx && mcWs ? {
+    problem: mcCtx.problem, language: mcWs.language, files: mcWs.files, plan: mcCtx.plan, startedAt: iv.started_at,
+    phase: (iv.phase === "review" || iv.phase === "wrap" ? iv.phase : "build") as "build" | "review" | "wrap",
+    revealed: Boolean(iv.mc_snapshot),
+  } : undefined;
   return (
     <InterviewRoom
       id={id}
-      title={dsa ? `DSA round · ${dsa.problem.title}` : KINDS[iv.kind]?.name ?? "Interview"}
+      title={dsa ? `DSA round · ${dsa.problem.title}` : mcCtx ? `Machine coding · ${mcCtx.problem.title}` : KINDS[iv.kind]?.name ?? "Interview"}
       personaName={PERSONAS[iv.persona] ? `${CHARACTERS[iv.persona].first} · ${PERSONAS[iv.persona].name}` : "Interviewer"}
       personaId={iv.persona}
       mode={iv.mode}
@@ -38,6 +47,7 @@ export default async function InterviewRoomPage({ params }: { params: Promise<{ 
       startedAt={iv.started_at}
       initialTurns={turns.map((t) => ({ id: t.id, role: t.role, content: t.content, code: t.code, board: t.board }))}
       dsa={dsaInit}
+      mc={mcInit}
       designPhase={iv.kind === "hld" ? iv.phase ?? "requirements" : undefined}
       board={["hld", "lld"].includes(iv.kind) ? { initialElements: ((iv.workspace as { board?: { elements?: Record<string, unknown>[] } } | null)?.board?.elements) ?? [] } : undefined}
     />

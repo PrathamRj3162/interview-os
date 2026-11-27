@@ -51,11 +51,11 @@ describe("content registry", () => {
     expect(new Set(items.map((i) => i.meta.id)).size).toBe(items.length);
     for (const i of items) { expect(i.meta.id.startsWith(`${i.meta.type}:`)).toBe(true); expect(i.meta.version).toBeGreaterThanOrEqual(1); }
   });
-  it("design library: 24 cases (20 HLD + 4 LLD), every one passing its checks, new ones shipped as draft", () => {
+  it("design library: 45 cases (20 HLD + 25 LLD), every one passing its checks, new ones shipped as draft", () => {
     const cases = items.filter((i) => i.meta.type === "design-case");
-    expect(cases).toHaveLength(24);
+    expect(cases).toHaveLength(45);
     for (const i of cases) for (const c of i.checks) expect(c.ok, `${i.meta.id}: ${c.name} ${c.detail ?? ""}`).toBe(true);
-    expect(cases.filter((i) => i.meta.status === "draft")).toHaveLength(12);
+    expect(cases.filter((i) => i.meta.status === "draft")).toHaveLength(33);
   });
   it("every item, draft or live, passes its automated checks (same checks /review shows)", () => {
     expect(items.filter((i) => i.meta.type === "primer")).toHaveLength(25);

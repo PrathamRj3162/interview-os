@@ -48,8 +48,9 @@ export default async function DashboardPage() {
   // Days are IST everywhere (XP, streaks, tasks); the server runs in UTC.
   const today = dayKey(new Date());
   const [subs, accepted, quizzes, interviews, quota, resumeRes, recentRes, tasksRes] = await Promise.all([
-    supabase.from("submissions").select("id", { count: "exact", head: true }),
-    supabase.from("submissions").select("id", { count: "exact", head: true }).eq("status", "accepted"),
+    // Coding accuracy = DSA submissions only (machine coding submits are "mc:<slug>").
+    supabase.from("submissions").select("id", { count: "exact", head: true }).not("problem_slug", "like", "mc:%"),
+    supabase.from("submissions").select("id", { count: "exact", head: true }).eq("status", "accepted").not("problem_slug", "like", "mc:%"),
     supabase.from("quiz_attempts").select("score,total").neq("quiz_slug", "design-fundamentals").limit(1000), // CS accuracy: MCQ quizzes only
     supabase.from("mock_interviews").select("overall_score").eq("status", "completed").limit(1000),
     remainingQuota(supabase, user.id),

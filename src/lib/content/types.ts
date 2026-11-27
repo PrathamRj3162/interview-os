@@ -4,7 +4,7 @@
  * items are shown to users; admins also see `reviewed` items (marked "Preview").
  */
 export type ContentStatus = "draft" | "reviewed" | "live";
-export type ContentType = "design-case" | "primer" | "design-question" | "estimation-drill";
+export type ContentType = "design-case" | "primer" | "design-question" | "estimation-drill" | "mc-problem" | "lld-lesson";
 export type ContentDifficulty = "starter" | "intermediate" | "advanced";
 
 export type ContentMeta = {

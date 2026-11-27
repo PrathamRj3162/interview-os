@@ -7,7 +7,8 @@ import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/supabase/server";
 import { loadInterview } from "@/lib/interview/server";
 import { KINDS, PERSONAS } from "@/lib/interview/config";
-import type { DsaReport, DesignReport } from "@/lib/interview/engine";
+import type { DsaReport, DesignReport, McReport } from "@/lib/interview/engine";
+import { existingLinesChanged } from "@/lib/mc/scoring";
 import { toView, type ViewReport, type ViewCategory } from "@/lib/interview/report-view";
 import { fmtClock, type CodeNote, type NoteKind } from "@/lib/interview/metrics";
 import type { Level } from "@/lib/interview/verdict";
@@ -128,7 +129,8 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
 
       {r.dsa && <DsaSection d={r.dsa} code={r.code} />}
       {r.design && <DesignSection d={r.design} />}
-      {!r.dsa && r.code && (
+      {r.mc && <McSection m={r.mc} />}
+      {!r.dsa && !r.mc && r.code && (
         <section aria-labelledby="code-h" className="space-y-3">
           <h2 id="code-h" className="text-lg font-medium">Your final code</h2>
           <AnnotatedCode code={r.code} />
@@ -477,6 +479,50 @@ function DesignSection({ d }: { d: DesignReport }) {
           <pre className="overflow-auto border-t border-border p-4 font-mono text-xs">{d.board}</pre>
         </details>
       )}
+    </section>
+  );
+}
+
+/** Machine coding: tests, how the new requirement changed the code, and static facts — all measured in code. */
+function McSection({ m }: { m: McReport }) {
+  const d = m.diff;
+  return (
+    <section aria-labelledby="mc-h" className="space-y-3" data-testid="mc-report">
+      <h2 id="mc-h" className="text-lg font-medium">Machine coding · {m.problem.title}</h2>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="p-4">
+          <p className="text-xs text-muted">Hidden tests (final submit)</p>
+          {m.tests ? (<>
+            <p className="mt-1 font-mono text-2xl tabular-nums" data-testid="mc-core">{m.tests.core.passed}/{m.tests.core.total} <span className="text-sm text-muted">core</span></p>
+            <p className="font-mono text-sm tabular-nums">{m.tests.revealed ? `${m.tests.ext.passed}/${m.tests.ext.total} new requirement` : "new requirement: not submitted after the reveal"}</p>
+          </>) : <p className="mt-1 text-sm text-muted">Never submitted, so nothing was measured.</p>}
+          <p className="mt-1 text-xs text-muted">{m.submits} submit{m.submits === 1 ? "" : "s"} in total.</p>
+        </Card>
+        <Card className="p-4" data-testid="mc-diff">
+          <p className="text-xs text-muted">The new requirement{m.revealedAtMin != null ? ` (revealed at minute ${m.revealedAtMin})` : ""}</p>
+          {d ? (<>
+            <p className="mt-1 text-sm">{d.filesAdded} file(s) added · {d.filesChanged} changed · {d.filesDeleted} deleted</p>
+            <p className="text-sm"><span className="font-mono">{existingLinesChanged(d)}</span> existing line(s) changed · <span className="font-mono">+{d.linesAdded} / −{d.linesRemoved}</span> in total</p>
+            {d.perFile.length > 0 && <ul className="mt-2 space-y-0.5 text-xs text-muted">{d.perFile.map((f) => <li key={f.file} className="font-mono">{f.file}: {f.status} +{f.added}/−{f.removed}</li>)}</ul>}
+          </>) : <p className="mt-1 text-sm text-muted">Not revealed — the build ended before it.</p>}
+        </Card>
+        <Card className="p-4 text-sm">
+          <p className="text-xs text-muted">Code facts (computed, not judged)</p>
+          <p className="mt-1">{m.facts.files} files · {m.facts.types} types ({m.facts.interfaces} interface/abstract) · {m.facts.methods} methods</p>
+          {m.facts.longestMethod && <p>Longest method: <span className="font-mono">{m.facts.longestMethod.name}</span> ({m.facts.longestMethod.lines} lines)</p>}
+          <p>Repeated blocks: {m.facts.duplicateBlocks}</p>
+          {m.facts.unvalidatedPublicMethods.length > 0 && <p className="mt-1 text-xs text-muted">Public methods that never check their inputs: {m.facts.unvalidatedPublicMethods.slice(0, 4).join("; ")}</p>}
+          {m.facts.sharedMutableState.length > 0 && <p className="mt-1 text-xs text-warning">Unsynchronised shared state: {m.facts.sharedMutableState.slice(0, 4).join("; ")}</p>}
+        </Card>
+      </div>
+      <details className="rounded-[var(--radius-lg)] border border-border bg-surface">
+        <summary className="cursor-pointer px-4 py-3 font-medium">Your final code ({Object.keys(m.files).length} files)</summary>
+        <div className="space-y-3 border-t border-border p-4">
+          {Object.entries(m.files).map(([name, src]) => (
+            <div key={name}><p className="font-mono text-xs text-muted">{name}</p><pre className="mt-1 max-h-80 overflow-auto rounded bg-surface-2 p-3 font-mono text-xs">{src}</pre></div>
+          ))}
+        </div>
+      </details>
     </section>
   );
 }

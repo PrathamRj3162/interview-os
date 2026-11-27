@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check } from "lucide-react";
 import { createInterview } from "@/app/actions/interview";
 import { Button } from "@/components/ui/button";
 import { Field, FormMessage, Select } from "@/components/ui/form";
+import { MC_DURATIONS } from "@/lib/mc/meta";
 import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS, CHARACTERS, TIERS, type KindId, type PersonaId, type Difficulty, type TierId } from "@/lib/interview/config";
 import { InterviewerAvatar } from "./avatar";
 
@@ -19,8 +20,9 @@ const option = "cursor-pointer rounded-[var(--radius-md)] border px-4 py-3 text-
 const on = "border-accent bg-accent-soft";
 const off = "border-border bg-surface hover:border-border-strong hover:bg-surface-2";
 
-export function SetupForm({ defaults, resumes, suggestions }: {
-  defaults: { kind: KindId; mode?: "mock" | "practice"; topic?: string | null; designCase?: string | null; projectId?: string | null; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
+export function SetupForm({ defaults, resumes, suggestions, mcProblems }: {
+  mcProblems?: { slug: string; title: string; level: string }[];
+  defaults: { mcProblem?: string | null; kind: KindId; mode?: "mock" | "practice"; topic?: string | null; designCase?: string | null; projectId?: string | null; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
   resumes: { id: string; file_name: string; analysed: boolean }[];
   /** Suggested difficulty per round, from recent verdicts. */
   suggestions?: Partial<Record<KindId, { difficulty: Difficulty; reason: string }>>;
@@ -42,6 +44,10 @@ export function SetupForm({ defaults, resumes, suggestions }: {
   const [company, setCompany] = useState(defaults.company ?? "none");
   const [problem, setProblem] = useState(defaults.problem ?? "none");
   const isDsa = kind === "dsa";
+  const isMc = kind === "machine_coding";
+  const [mcProblem, setMcProblem] = useState(defaults.mcProblem ?? "none");
+  const durationOptions: readonly number[] = isMc ? MC_DURATIONS : DURATIONS;
+  const effectiveDuration = durationOptions.includes(Number(duration)) ? duration : String(isMc ? 110 : 20);
   // DSA round in Python: start downloading the in-browser Python runtime now, so the first Run in the room is instant.
   useEffect(() => { if (isDsa && (language === "python" || (language === "none" && defaults.language === "python"))) warmPython(); }, [isDsa, language, defaults.language]);
 
@@ -124,8 +130,8 @@ export function SetupForm({ defaults, resumes, suggestions }: {
       <div hidden={step !== 2} className="grid gap-6 lg:grid-cols-5">
         <div className="grid gap-4 sm:grid-cols-2 lg:col-span-3">
           <Field label="Duration" htmlFor="duration_min">
-            <Select id="duration_min" name="duration_min" value={duration} onChange={(e) => setDuration(e.target.value)}>
-              {DURATIONS.map((d) => <option key={d} value={d}>{d} minutes</option>)}
+            <Select id="duration_min" name="duration_min" value={effectiveDuration} onChange={(e) => setDuration(e.target.value)}>
+              {durationOptions.map((d) => <option key={d} value={d}>{isMc ? (d === 110 ? "110 minutes (90 build + 20 review)" : "60 minutes (48 build + 12 review)") : `${d} minutes`}</option>)}
             </Select>
           </Field>
           <Field label="Answer by" htmlFor="input_mode" hint={input === "voice" ? "Pause detection sends your answer when you stop talking (cancellable). Test your setup first in the mic check (opens in a new tab)." : undefined}>
@@ -143,7 +149,7 @@ export function SetupForm({ defaults, resumes, suggestions }: {
           </Field>
           <Field label="Programming language" htmlFor="language">
             <Select id="language" name="language" value={language} onChange={(e) => setLanguage(e.target.value)}>
-              <option value="none">{isDsa ? "My profile's language" : "Not relevant"}</option>
+              <option value="none">{isDsa || isMc ? "My profile's language" : "Not relevant"}</option>
               {Object.entries(LANGUAGES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </Select>
           </Field>
@@ -159,6 +165,14 @@ export function SetupForm({ defaults, resumes, suggestions }: {
               </Select>
             </Field>
           )}
+          {isMc && (
+            <Field label="Problem" htmlFor="mc_problem" hint="A command-line app you build in your language; a new requirement appears two-thirds of the way through.">
+              <Select id="mc_problem" name="mc_problem" value={mcProblem} onChange={(e) => setMcProblem(e.target.value)}>
+                <option value="none">Pick one for me</option>
+                {(mcProblems ?? []).map((p) => <option key={p.slug} value={p.slug}>{p.title} ({p.level})</option>)}
+              </Select>
+            </Field>
+          )}
           <Field label="Target company" htmlFor="company" hint="Style practice only — never presented as real questions.">
             <Select id="company" name="company" value={company} onChange={(e) => setCompany(e.target.value)}>
               <option value="none">General</option>
@@ -171,9 +185,10 @@ export function SetupForm({ defaults, resumes, suggestions }: {
           <dl className="mt-3 space-y-2 text-sm">
             {[
               ["Round", KINDS[kind].name], ["Interviewer", `${CHARACTERS[persona].first} · ${PERSONAS[persona].name} (${TIERS[CHARACTERS[persona].tier].label})`], ["Difficulty", difficulty], ["Mode", mode === "mock" ? "Mock (no hints)" : "Practice (hints)"],
-              ["Duration", `${duration} min`], ["Answer by", input === "voice" ? "Voice" : "Typing"],
+              ["Duration", `${effectiveDuration} min`], ["Answer by", input === "voice" ? "Voice" : "Typing"],
               ["Resume", resumes.find((r) => r.id === resumeId)?.file_name ?? "Not used"], ["Company style", company === "none" ? "General" : company],
               ...(isDsa ? [["Problem", PROBLEMS.find((p) => p.slug === problem)?.title ?? "Random"]] : []),
+              ...(isMc ? [["Problem", mcProblems?.find((p) => p.slug === mcProblem)?.title ?? "Random"]] : []),
             ].map(([k, v]) => <div key={k} className="flex justify-between gap-4"><dt className="text-muted">{k}</dt><dd className="truncate text-right capitalize">{v}</dd></div>)}
           </dl>
         </aside>

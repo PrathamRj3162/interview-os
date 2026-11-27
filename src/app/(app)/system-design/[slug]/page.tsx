@@ -55,6 +55,7 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href={practice} className={buttonClasses("primary", "sm")} data-testid="practise-design"><Mic className="size-4" aria-hidden />Practise this with Nisha</Link>
           <MarkReadButton itemType={c.kind} slug={slug} topic={c.title} done={p?.status === "completed"} />
+          {c.mc && <Link href={`/interview/new?kind=machine_coding&mc=${c.mc}`} className={buttonClasses("secondary", "sm")} data-testid="build-it">Build it (machine coding)</Link>}
         </div>
       </Card>
       <details className="rounded-[var(--radius-lg)] border border-border bg-surface">

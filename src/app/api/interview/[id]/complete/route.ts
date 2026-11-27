@@ -1,4 +1,7 @@
 import { CASE_BY_SLUG } from "@/lib/learn/design";
+import { filesAsText, mcContextFor, type McWorkspace } from "@/lib/mc/server";
+import { describeFacts, extensionDiff, staticFacts } from "@/lib/mc/analysis";
+import { completenessScore, extensibilityScore } from "@/lib/mc/scoring";
 import { dayKey } from "@/lib/progress/xp";
 import { DESIGN_PHASE_LABELS, type DesignPhase } from "@/lib/interview/design-phases";
 import { NextResponse, type NextRequest } from "next/server";
@@ -8,6 +11,7 @@ import { recordUsage } from "@/lib/ai/quota";
 import { evaluateInterview } from "@/lib/interview/engine";
 import { loadInterview, loadTurns } from "@/lib/interview/server";
 import { pairTurns } from "@/lib/interview/analysis";
+import type { McReport } from "@/lib/interview/engine";
 import type { DsaReport, EvaluationContext } from "@/lib/interview/engine";
 import { computeMetrics } from "@/lib/interview/metrics";
 import { dsaContextFor, loadEvents, type Workspace } from "@/lib/dsa/server";
@@ -138,6 +142,38 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         `Phases reached (moved on by the server's timer or by the interviewer): ${ctx.design.phasesReached.join(" → ")}.`,
         curveball ? `Curveball given in the curveball phase: ${curveball}` : "The curveball phase was not reached.",
       ].filter(Boolean).join("\n");
+    }
+    const mcCtx = mcContextFor(iv);
+    if (mcCtx) {
+      const mws = iv.workspace as McWorkspace | null;
+      const files = mws?.files ?? {};
+      const lang = mws?.language ?? "java";
+      const [{ data: subs }, events] = await Promise.all([
+        supabase.from("submissions").select("results, created_at").eq("interview_id", id).order("created_at"),
+        loadEvents(supabase, id),
+      ]);
+      const last = subs?.at(-1)?.results as { status?: string; core?: { passed: number; total: number }; ext?: { passed: number; total: number }; revealed?: boolean } | undefined;
+      const snap = iv.mc_snapshot as { files?: Record<string, string>; atMin?: number } | null;
+      const diff = snap?.files ? extensionDiff(snap.files, files) : null;
+      const sf = staticFacts(files, lang, { concurrency: mcCtx.problem.concurrency });
+      const completeness = completenessScore(last?.core ?? null);
+      const extensibility = extensibilityScore(last?.revealed ? last.ext ?? null : null, diff);
+      const report: McReport = {
+        problem: { slug: mcCtx.problem.slug, title: mcCtx.problem.title }, language: lang, submits: subs?.length ?? 0,
+        tests: last?.core ? { core: last.core, ext: last.ext ?? { passed: 0, total: 0 }, revealed: Boolean(last.revealed) } : null,
+        revealedAtMin: snap?.atMin ?? null, diff, facts: sf,
+        files: Object.fromEntries(Object.entries(files).map(([n, s]) => [n, s.slice(0, 20_000)])),
+      };
+      ctx.mc = { completeness, extensibility, exclude: mcCtx.problem.concurrency ? [] : ["concurrency"], report };
+      ctx.coding = { best: last?.core ? { status: last.status === "accepted" ? "accepted" : "wrong_answer", passed: last.core.passed, total: last.core.total, regularAllPassed: last.core.passed === last.core.total } : null, examplesPassed: events.some((e) => e.type === "remote_run") };
+      ctx.code = { language: lang, source: filesAsText(files, 12_000) };
+      facts = [
+          `Machine coding problem: ${mcCtx.problem.title}${mcCtx.problem.concurrency ? " (concurrency matters for this problem)" : ""}.`,
+          `Hidden tests on the final submit: ${completeness.evidence} ${extensibility.evidence}`,
+          snap ? `The new requirement ("${mcCtx.problem.extension.title}") was revealed at minute ${snap.atMin ?? "?"}.` : "The new requirement was never revealed (the build ended first).",
+          ...describeFacts(sf, mcCtx.problem.concurrency),
+          "Completeness and extensibility are measured from the tests and the diff; do NOT score them. Score the other categories from the code and the review conversation.",
+      ].join("\n");
     }
     // Finishing a round on a lab case counts as attempting it (unlocks the case's reference answer).
     if (iv.design_case && (iv.kind === "hld" || iv.kind === "lld")) {
