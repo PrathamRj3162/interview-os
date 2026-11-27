@@ -1,3 +1,4 @@
+import { LLD_DIAGRAMS } from "./lld-cases";
 /**
  * Reference architecture diagrams for the system design lab. Data only — rendered as inline SVG by
  * components/learn/design-diagram.tsx. Nodes sit on a small grid (col, row); edges are directed.
@@ -132,5 +133,7 @@ export const DESIGN_DIAGRAMS: Record<string, Diagram> = {
     edges: [e("cu", "ord", "place (idempotent)"), e("ord", "rest", "accept?"), e("ord", "disp", "assign"), e("disp", "geo", "nearby"), e("dp", "loc", "GPS"), e("loc", "geo"), e("disp", "dp", "offer", true), e("eta", "cu", "live ETA", true)],
   },
 };
+
+Object.assign(DESIGN_DIAGRAMS, LLD_DIAGRAMS);
 
 if (process.env.E2E_FIXTURES === "1") DESIGN_DIAGRAMS["e2e-fixture"] = DESIGN_DIAGRAMS["url-shortener"];

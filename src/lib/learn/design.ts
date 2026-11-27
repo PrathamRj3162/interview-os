@@ -6,6 +6,7 @@ import { contentId, type ContentMeta, type ContentStatus } from "@/lib/content/t
 import type { ChecklistItem } from "@/lib/interview/design-report";
 import { CASE_EXTRAS } from "./design-extras";
 import { NEW_CASES } from "./design-cases-2";
+import { LLD_CASES } from "./lld-cases";
 
 export type DesignCase = {
   slug: string;
@@ -33,6 +34,8 @@ export type DesignCase = {
   variants?: { sde1: string; sde2: string };
   /** Common mistakes, revealed with the reference answer. */
   mistakes?: string[];
+  /** LLD cases that also exist as a machine coding problem (same statement, 90-minute build). */
+  mc?: string;
 };
 
 export const HLD_FRAMEWORK = [
@@ -236,7 +239,7 @@ const E2E_FIXTURE: DesignCase[] = process.env.E2E_FIXTURES === "1"
   ? [{ ...WITH_EXTRAS[0], slug: "e2e-fixture", title: "E2E fixture case", status: "draft" }]
   : [];
 
-export const DESIGN_CASES: DesignCase[] = [...WITH_EXTRAS, ...NEW_CASES, ...E2E_FIXTURE];
+export const DESIGN_CASES: DesignCase[] = [...WITH_EXTRAS, ...NEW_CASES, ...LLD_CASES, ...E2E_FIXTURE];
 
 export const CASE_BY_SLUG: Record<string, DesignCase> = Object.fromEntries(DESIGN_CASES.map((c) => [c.slug, c]));
 
