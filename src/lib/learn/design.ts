@@ -3,6 +3,7 @@
  * interviewers care about the reasoning and trade-offs. Each case links to a focused practice round.
  */
 import { contentId, type ContentMeta, type ContentStatus } from "@/lib/content/types";
+import type { ChecklistItem } from "@/lib/interview/design-report";
 
 export type DesignCase = {
   slug: string;
@@ -24,6 +25,8 @@ export type DesignCase = {
   followUps: string[];
   /** Scheduled curveballs for the live round (one is picked per interview). */
   curveballs?: string[];
+  /** Weighted must-cover checklist for the live round's coverage score (HLD). */
+  checklist?: ChecklistItem[];
 };
 
 export const HLD_FRAMEWORK = [
@@ -56,6 +59,22 @@ const BASE_CASES: DesignCase[] = [
     deepDives: ["Why hashing the URL alone risks collisions and how ranges avoid coordination", "301 (cacheable, fewer hits) vs 302 (accurate analytics)", "Expiry: lazy delete on read plus a background sweeper"],
     tradeoffs: ["Counter-based keys are guessable; add randomness if links must be private", "Strong consistency only on create; reads can be eventually consistent"],
     followUps: ["How do you stop abuse (spam, malware links)?", "What happens if a cache node dies?", "How would you support custom domains?"],
+    checklist: [
+      { id: "read_heavy", item: "Identifies the read-heavy ratio and a latency target for redirects", weight: 2 },
+      { id: "estimates", item: "Sizes writes/s, reads/s and storage from stated numbers", weight: 2 },
+      { id: "key_gen", item: "Collision-free short-key generation (ranges, counter + base62, or checked hashing)", weight: 3 },
+      { id: "data_model", item: "Key-value data model keyed by the short code", weight: 1 },
+      { id: "cache", item: "Caches hot codes in front of the store (and says what happens on a miss)", weight: 3 },
+      { id: "redirect_code", item: "Chooses 301 vs 302 with the analytics trade-off", weight: 1 },
+      { id: "async_analytics", item: "Records clicks asynchronously so redirects stay fast", weight: 2 },
+      { id: "expiry", item: "Handles expiry (lazy check on read and/or background cleanup)", weight: 1 },
+      { id: "abuse", item: "Mentions abuse controls (rate limits, malicious-link checks)", weight: 1 },
+    ],
+    curveballs: [
+      "A single link goes viral and now gets about 40% of all redirects. What happens, and how do you handle it?",
+      "Marketing wants custom aliases for every enterprise customer, and alias collisions must be impossible. What changes?",
+      "Your cache cluster loses half its nodes during peak traffic. What happens to redirect latency, and what do you change?",
+    ],
   },
   {
     slug: "rate-limiter", title: "Rate limiter", kind: "hld", level: "Starter",

@@ -216,12 +216,151 @@ const GENERIC: Anchors = [
   "Strong: complete, precise and unprompted.",
 ];
 
-export const anchorsFor = (id: string): Anchors => ANCHORS[id] ?? GENERIC;
+/**
+ * System design (HLD) rubric v2: two anchor sets per category, because the bar rises with level.
+ * SDE-1: a reasonable, coherent design with basic scaling. SDE-2+: justified trade-offs, failure modes, operations.
+ */
+export type DesignLevel = "sde1" | "sde2";
+export const designLevel = (difficulty: string): DesignLevel => (difficulty === "hard" || difficulty === "expert" ? "sde2" : "sde1");
+export const DESIGN_LEVEL_LABEL: Record<DesignLevel, string> = { sde1: "SDE-1 bar", sde2: "SDE-2+ bar" };
+
+export const HLD_ANCHORS: Record<string, Record<DesignLevel, Anchors>> = {
+  requirements: {
+    sde1: [
+      "Started designing without clarifying what the system must do.",
+      "Listed some features but no non-functional needs (scale, latency, availability) until prompted.",
+      "Clarified core features and at least two non-functional needs, with a stated number for scale or latency.",
+      "Scoped precisely: prioritised features, stated non-functional numbers and assumptions, and named what is out of scope.",
+    ],
+    sde2: [
+      "Started designing without clarifying what the system must do.",
+      "Clarified features but treated non-functional needs vaguely (\"fast\", \"scalable\") without numbers.",
+      "Stated non-functional targets as numbers (QPS, p99 latency, availability) and the consistency needs per operation.",
+      "Drove scoping like an owner: numeric targets, consistency per operation, explicit trade-off priorities and out-of-scope items, unprompted.",
+    ],
+  },
+  estimation: {
+    sde1: [
+      "No estimates, or numbers off by orders of magnitude.",
+      "Some numbers, but they never influenced a design choice.",
+      "Reasonable QPS and storage estimates, and at least one later choice was explained by a number.",
+      "Quick, correct estimates (average and peak, storage, bandwidth) that clearly drove several choices.",
+    ],
+    sde2: [
+      "No estimates, or numbers off by orders of magnitude.",
+      "Estimates given but not connected to any decision.",
+      "Estimates drove concrete decisions (sharding, caching, partition counts) and peak vs average was considered.",
+      "Estimates drove decisions and were revisited when the design or the requirements changed (e.g. the curveball).",
+    ],
+  },
+  api_data: {
+    sde1: [
+      "No API or data model.",
+      "A vague API or data model with missing keys or unclear entities.",
+      "Clear main endpoints (inputs/outputs) and a data model with keys suited to the main queries.",
+      "Clean API with pagination/idempotency where needed and a data model designed around access patterns, with the store choice explained.",
+    ],
+    sde2: [
+      "No API or data model.",
+      "API and entities named, but keys and access patterns not thought through.",
+      "API with idempotency/pagination where needed; data model and partition keys chosen from the access patterns.",
+      "Data model justified against access patterns and growth (hot partitions, secondary indexes, retention), with the alternative considered.",
+    ],
+  },
+  architecture: {
+    sde1: [
+      "No coherent design: missing core components, or components that don't connect.",
+      "Main components named, but the request flow is unclear or a core path is missing.",
+      "Coherent components covering the requirements; walked through a read and a write path (on the board or in words).",
+      "Clean, minimal design whose every component has a stated purpose; both main paths walked through end to end.",
+    ],
+    sde2: [
+      "No coherent design: missing core components, or components that don't connect.",
+      "Components drawn, but responsibilities blur or the design over-engineers without reason.",
+      "Coherent, minimal design with clear boundaries; data flow, sync vs async and failure points identified.",
+      "Clear boundaries, sync/async choices justified, and the design evolves cleanly from simple to scaled as requirements tighten.",
+    ],
+  },
+  deep_dive: {
+    sde1: [
+      "Couldn't go deeper than the box level on the component the interviewer chose.",
+      "Went one level deeper but stayed generic (\"add a cache\") without how it works.",
+      "Explained how the chosen component works: data layout, the main algorithm or flow, and one way it fails.",
+      "Detailed, correct internals of the chosen component, including its failure handling and limits.",
+    ],
+    sde2: [
+      "Couldn't go deeper than the box level on the component the interviewer chose.",
+      "Some depth but missed the critical issue for this component (hot keys, consistency, ordering, fan-out).",
+      "Found and handled the critical issue in the chosen component, with a concrete mechanism and its cost.",
+      "Expert depth: the critical issue, alternatives with their costs, failure modes and recovery, and how to verify it in production.",
+    ],
+  },
+  scaling: {
+    sde1: [
+      "No scaling or reliability thinking.",
+      "Mentioned scaling tools (caching, sharding, replicas) without saying where or why.",
+      "Applied caching, replication or sharding where the numbers needed it, with the reason.",
+      "Scaled each tier appropriately and covered basic failure handling (retries, replicas, timeouts).",
+    ],
+    sde2: [
+      "No scaling or reliability thinking.",
+      "Generic scaling with no failure analysis.",
+      "Bottlenecks identified from the numbers; scaling and replication choices with consistency implications; failure of key components handled.",
+      "Handled hot spots, partial failures, backpressure and multi-region concerns proportionately, including the curveball.",
+    ],
+  },
+  tradeoffs: {
+    sde1: [
+      "No alternatives considered.",
+      "Said things are trade-offs without naming the alternative or the cost.",
+      "Named the alternative and what was given up for at least one key choice.",
+      "Weighed alternatives crisply for the key choices and tied them back to the requirements.",
+    ],
+    sde2: [
+      "No alternatives considered.",
+      "Named alternatives but the reasoning didn't match the requirements.",
+      "For the key choices, named the alternative, what was given up, and why it is right for these requirements.",
+      "Trade-offs drove the design and were revisited when constraints changed; quantified costs where possible.",
+    ],
+  },
+  operations: {
+    sde1: [
+      "Nothing on running the system.",
+      "Mentioned monitoring or failures only when asked, without specifics.",
+      "Named what to monitor (key metrics/alerts) and how a main failure would be noticed and handled.",
+      "Covered monitoring, a failure scenario, safe deployment and a basic security point (auth, abuse limits).",
+    ],
+    sde2: [
+      "Nothing on running the system.",
+      "Generic \"add monitoring\" with no concrete signals.",
+      "Concrete SLIs/alerts, failure detection and recovery, safe rollout and abuse/security controls for this system.",
+      "Operational plan an on-call engineer could use: SLOs, dashboards, runbook-level failure handling, migrations and capacity planning.",
+    ],
+  },
+  communication: {
+    sde1: [
+      "Disorganised; the interviewer had to drive every step.",
+      "Followed the interviewer's lead but lost structure or time in places.",
+      "Structured the discussion (requirements → estimates → design → deep dive), checked in and used the whiteboard.",
+      "Drove the whole discussion with clear structure, time awareness and a readable diagram.",
+    ],
+    sde2: [
+      "Disorganised; the interviewer had to drive every step.",
+      "Structured but passive; waited for prompts to go deeper.",
+      "Drove the discussion, managed time across phases and kept the diagram in sync with the conversation.",
+      "Led like a senior engineer: framed decisions, invited challenge, summarised trade-offs and next steps.",
+    ],
+  },
+};
+
+/** The anchors used to score a category. HLD categories use the level-calibrated v2 sets. */
+export const anchorsFor = (id: string, opts?: { kind?: KindId; level?: DesignLevel }): Anchors =>
+  (opts?.kind === "hld" && HLD_ANCHORS[id] ? HLD_ANCHORS[id][opts.level ?? "sde1"] : undefined) ?? ANCHORS[id] ?? GENERIC;
 
 /** The categories that matter most for each round: they count double and gate the verdict. */
 export const CORE: Record<KindId, string[]> = {
   dsa: ["approach", "correctness"],
-  hld: ["architecture", "scaling"],
+  hld: ["architecture", "deep_dive"],
   lld: ["modeling", "principles"],
   project: ["depth", "decisions"],
   resume_screen: ["claims", "depth"],

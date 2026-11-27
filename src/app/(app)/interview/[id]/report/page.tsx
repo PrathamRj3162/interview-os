@@ -7,7 +7,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { requireUser } from "@/lib/supabase/server";
 import { loadInterview } from "@/lib/interview/server";
 import { KINDS, PERSONAS } from "@/lib/interview/config";
-import type { DsaReport } from "@/lib/interview/engine";
+import type { DsaReport, DesignReport } from "@/lib/interview/engine";
 import { toView, type ViewReport, type ViewCategory } from "@/lib/interview/report-view";
 import { fmtClock, type CodeNote, type NoteKind } from "@/lib/interview/metrics";
 import type { Level } from "@/lib/interview/verdict";
@@ -46,12 +46,12 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
   if (iv.status !== "completed" || !iv.report) redirect(`/interview/${id}`);
   const r = toView(iv.report);
 
-  // Compare only with a previous report on the same scale (v1 used 1–5, v2 uses 1–4).
+  // Compare only with a previous report on the same scale (v1 used 1–5, v2 uses 1–4) and rubric (e.g. HLD v2).
   const { data: previous } = await supabase.from("mock_interviews")
-    .select("id, overall_score, started_at, version:report->>version").eq("kind", iv.kind).eq("status", "completed")
+    .select("id, overall_score, started_at, version:report->>version, rubric:report->>rubric").eq("kind", iv.kind).eq("status", "completed")
     .lt("started_at", iv.started_at).order("started_at", { ascending: false }).limit(1);
-  const prev = previous?.[0] as { id: string; overall_score: number | null; version: string | null } | undefined;
-  const sameScale = prev && String(prev.version ?? "1") === String(r.version);
+  const prev = previous?.[0] as { id: string; overall_score: number | null; version: string | null; rubric: string | null } | undefined;
+  const sameScale = prev && String(prev.version ?? "1") === String(r.version) && (prev.rubric ?? null) === (r.rubric ?? null);
   const delta = sameScale && prev?.overall_score != null && r.overall != null ? Math.round(r.overall - Number(prev.overall_score)) : null;
   const xpEarned = r.overall != null && r.communication.answers >= 3 ? Math.round(r.overall * (DIFF_MULT[iv.difficulty] ?? 1)) : 0;
   const base = `/interview/new?kind=${iv.kind}&persona=${iv.persona}${iv.resume_id ? `&resume=${iv.resume_id}` : ""}`;
@@ -127,6 +127,7 @@ export default async function ReportPage({ params }: { params: Promise<{ id: str
       )}
 
       {r.dsa && <DsaSection d={r.dsa} code={r.code} />}
+      {r.design && <DesignSection d={r.design} />}
       {!r.dsa && r.code && (
         <section aria-labelledby="code-h" className="space-y-3">
           <h2 id="code-h" className="text-lg font-medium">Your final code</h2>
@@ -307,7 +308,8 @@ function RubricCard({ c, scale }: { c: ViewCategory; scale: 4 | 5 }) {
           {c.evidence.map((q, i) => (
             <li key={i} className="flex gap-2 border-l-2 border-border pl-3 text-xs text-muted">
               {q.at != null && <span className="shrink-0 font-mono not-italic text-accent" title="When you said it">{fmtClock(q.at)}</span>}
-              <span className={c.source === "judge" ? "" : "italic"}>{c.source === "judge" ? q.text : <>&ldquo;{q.text}&rdquo;</>}</span>
+              {q.kind === "board" && <span className="shrink-0 rounded bg-surface-2 px-1 not-italic" title="An element on your whiteboard">board</span>}
+              <span className={c.source === "judge" || q.kind === "board" ? "font-mono" : "italic"}>{c.source === "judge" || q.kind === "board" ? q.text : <>&ldquo;{q.text}&rdquo;</>}</span>
             </li>
           ))}
         </ul>
@@ -410,6 +412,70 @@ function DsaSection({ d, code }: { d: DsaReport; code?: ViewReport["code"] }) {
             ))}
           </ul>
         </Card>
+      )}
+    </section>
+  );
+}
+
+/** System design round: level, checklist coverage from verified evidence, red flags, curveball, final board. */
+function DesignSection({ d }: { d: DesignReport }) {
+  const cov = d.coverage;
+  return (
+    <section aria-labelledby="design-h" className="space-y-3" data-testid="design-report">
+      <h2 id="design-h" className="text-lg font-medium">System design{d.case ? ` · ${d.case.title}` : ""}</h2>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card className="p-4">
+          <p className="text-xs text-muted">Scored against</p>
+          <p className="mt-1 text-lg font-semibold">{d.levelLabel}</p>
+          <p className="mt-1 text-xs text-muted">Chosen by the round&apos;s difficulty. The rubric&apos;s anchors are stricter at SDE-2+.</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-muted">Checklist coverage</p>
+          {cov == null ? <p className="mt-1 text-sm text-muted">This round had no case checklist (free-form topic).</p>
+            : !cov.assessed ? <p className="mt-1 text-sm text-muted">Not assessed — the evaluator&apos;s coverage step failed, so no score is shown rather than a wrong one.</p>
+            : <p className="mt-1 font-mono text-2xl tabular-nums" data-testid="coverage-score">{cov.score}%</p>}
+          <p className="mt-1 text-xs text-muted">Weighted share of the must-cover items, counting only items backed by your own words or a whiteboard element.</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-xs text-muted">Phases reached</p>
+          <p className="mt-1 text-sm">{d.phasesReached.join(" → ") || "—"}</p>
+          {d.curveball && <p className="mt-2 text-xs"><span className="font-medium">Curveball:</span> <span className="text-muted">{d.curveball}</span></p>}
+        </Card>
+      </div>
+      {d.redFlags.length > 0 && (
+        <Card className="border-warning/40 p-4" data-testid="red-flags">
+          <p className="flex items-center gap-2 font-medium"><AlertTriangle className="size-4 text-warning" aria-hidden />Red flags interviewers look for</p>
+          <ul className="mt-2 space-y-1 text-sm">{d.redFlags.map((f) => <li key={f.id}><span className="font-medium">{f.label}.</span> <span className="text-muted">{f.detail}</span></li>)}</ul>
+          <p className="mt-2 text-xs text-muted">Detected by fixed rules from your answers, not by the AI.</p>
+        </Card>
+      )}
+      {cov && cov.assessed && (
+        <Card className="p-4">
+          <p className="font-medium">Must-cover checklist</p>
+          <ul className="mt-2 space-y-2 text-sm">
+            {cov.items.map((i) => (
+              <li key={i.id} className="flex gap-2">
+                {i.covered ? <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-label="Covered" /> : <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted" aria-label="Not covered" />}
+                <span>
+                  {i.item} <span className="text-xs text-muted">(weight {i.weight})</span>
+                  {i.covered && i.evidence && (
+                    <span className="mt-0.5 block text-xs text-muted">
+                      {i.at != null && <span className="mr-1 font-mono text-accent">{fmtClock(i.at)}</span>}
+                      {i.kind === "board" ? <span className="font-mono">board: {i.evidence}</span> : <>&ldquo;{i.evidence}&rdquo;</>}
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {cov.dropped > 0 && <p className="mt-2 text-xs text-muted">{cov.dropped} coverage claim(s) cited text that isn&apos;t in your answers or on your board and were discarded.</p>}
+        </Card>
+      )}
+      {d.board && (
+        <details className="rounded-[var(--radius-lg)] border border-border bg-surface">
+          <summary className="cursor-pointer px-4 py-3 font-medium">Your final whiteboard (as the interviewer read it)</summary>
+          <pre className="overflow-auto border-t border-border p-4 font-mono text-xs">{d.board}</pre>
+        </details>
       )}
     </section>
   );

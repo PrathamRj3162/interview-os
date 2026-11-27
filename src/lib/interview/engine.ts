@@ -5,7 +5,8 @@ import { streamChat, splitMeta, spokenFilter, META } from "@/lib/ai/live";
 import { untrusted } from "@/lib/ai/json";
 import { PERSONAS, KINDS, KIND_FOCUS, RUBRICS, DIFFICULTIES, CHARACTERS, TIERS, type KindId, type PersonaId, type Difficulty } from "./config";
 import { pairTurns, communicationStats, type Turn } from "./analysis";
-import { anchorsFor, isCore, weightOf, type Anchors } from "./rubric";
+import { anchorsFor, designLevel, isCore, weightOf, DESIGN_LEVEL_LABEL, type Anchors, type DesignLevel } from "./rubric";
+import { designRedFlags, scoreCoverage, verifyDesignEvidence, type ChecklistItem, type Coverage, type RedFlag } from "./design-report";
 import { companyPrompt } from "./companies";
 import { computeVerdict, pickOneThing, type CodingFacts, type Verdict } from "./verdict";
 import { locateQuote, numberLines, validateCodeNotes, type CodeNote, type Metrics } from "./metrics";
@@ -264,9 +265,12 @@ const evalSchema = z.object({
   drills: z.array(z.unknown()).catch([]).default([]).transform((ds) => ds.flatMap((d) => { const r = drill.safeParse(d); return r.success && r.data.title.trim() ? [r.data] : []; }).slice(0, 3)),
   code_notes: z.array(z.unknown()).catch([]).default([]).transform((ns) => ns.flatMap((n) => { const r = codeNote.safeParse(n); return r.success ? [r.data] : []; }).slice(0, 20)),
   communication_comment: text(800),
+  /** System design: checklist items the candidate covered, each with a quote or a whiteboard element (verified in code). */
+  coverage: z.array(z.unknown()).catch([]).default([]).transform((xs) => xs.flatMap((x) => { const r = z.object({ id: z.string().max(60), evidence: z.string().max(300) }).safeParse(x); return r.success ? [r.data] : []; }).slice(0, 40)),
 });
 
-export type Evidence = { text: string; at: number | null };
+/** A verified quote from the answers, or (system design) an element on the candidate's whiteboard. */
+export type Evidence = { text: string; at: number | null; kind?: "quote" | "board" };
 export type ReportCategory = {
   id: string; name: string; desc: string; core: boolean; weight: number;
   score: number | null; anchor: string | null; anchors: Anchors;
@@ -297,6 +301,10 @@ export type InterviewReport = {
   provider: string; model: string;
   /** DSA live-coding round: objective facts from the judge and the room (computed in code, not by AI). */
   dsa?: DsaReport;
+  /** System design round v2: level, checklist coverage from verified evidence, red flags, curveball. */
+  design?: DesignReport;
+  /** Rubric version, so trends only compare like with like. */
+  rubric?: "hld-v2";
   /** Answers that contained pasted text (80+ characters). A flag for the candidate; it doesn't change any score. */
   integrity?: { pastedAnswers: number; pastedChars: number };
 };
@@ -312,7 +320,21 @@ export type DsaReport = {
   next?: { slug: string; title: string; difficulty: string }[];
 };
 
+export type DesignReport = {
+  case?: { slug: string; title: string };
+  level: DesignLevel; levelLabel: string;
+  /** Null when the round had no case checklist (a free-form topic). */
+  coverage: (Coverage & { assessed: boolean }) | null;
+  redFlags: RedFlag[];
+  curveball?: string;
+  phasesReached: string[];
+  /** The last whiteboard the candidate sent (text form). */
+  board?: string;
+};
+
 export type EvaluationContext = {
+  /** System design: the case checklist and round facts. */
+  design?: { case?: { slug: string; title: string }; checklist: ChecklistItem[]; curveball?: string; phasesReached: string[] };
   /** Objective facts for the evaluator (judge results, hints, editor events). */
   facts?: string;
   metrics: Metrics;
@@ -346,6 +368,8 @@ async function chunkedEvaluation(a: {
   iv: InterviewRow; rubric: { id: string; name: string; desc: string }[]; rubricLinesFor: (ids: string[]) => string[];
   intro: string[]; scoringRule: string; evidenceRule: string; codeRule: string; commsRule: string; noVerdict: string;
   context: ChatMessage[]; hasCode: boolean; onStage?: (s: string) => void;
+  /** System design: also run a small coverage call. */
+  designRules?: string[];
 }): Promise<{ data: z.infer<typeof evalSchema>; provider: string; model: string }> {
   const groups: string[][] = [];
   for (let i = 0; i < a.rubric.length; i += 2) groups.push(a.rubric.slice(i, i + 2).map((r) => r.id));
@@ -363,17 +387,23 @@ async function chunkedEvaluation(a: {
   const overallJob = async () => generateObject(overallSchema, [sys([a.commsRule, a.noVerdict, "drills: exactly 3 practice drills targeting the weakest areas, each {title, how (specific steps), minutes, kind}; kind is one of dsa, lesson, quiz, system_design, project, mock, revision, resume.", "Return JSON with keys: summary, strengths, weaknesses, mistakes, missed_concepts, drills, communication_comment."]), ...a.context], { temperature: 0.2, maxTokens: 2500 });
   const questionJob = async () => generateObject(questionSchema, [sys(["For each question index, list briefly what was correct / incomplete / technically incorrect / missing, what a strong answer would contain, topics to study and a likely follow-up. Keep each item short.", 'Return JSON {"questions": [{index, correct, incomplete, incorrect, missing, strong_answer, better_structure, study, follow_ups}]}.']), ...a.context], { temperature: 0.2, maxTokens: 3500 });
   const codeJob = async () => generateObject(codeSchema, [sys([a.codeRule, 'Return JSON {"code_notes": [...]}.']), ...a.context], { temperature: 0.2, maxTokens: 1500 });
+  const coverageSchema = evalSchema.pick({ coverage: true });
+  const coverageJob = async () => generateObject(coverageSchema, [sys([...(a.designRules ?? []), 'Return JSON {"coverage": [{id, evidence}]}.']), ...a.context], { temperature: 0.2, maxTokens: 1500 });
   const [overall, ...rest] = await pool<{ data: Record<string, unknown>; provider: string; model: string }>(
-    [overallJob, ...catJobs, questionJob, ...(a.hasCode ? [codeJob] : [])] as (() => Promise<{ data: Record<string, unknown>; provider: string; model: string }>)[], 3);
+    [overallJob, ...catJobs, questionJob, ...(a.hasCode ? [codeJob] : []), ...(a.designRules ? [coverageJob] : [])] as (() => Promise<{ data: Record<string, unknown>; provider: string; model: string }>)[], 3);
   if (overall.status !== "fulfilled") throw overall.reason;
   const cats = rest.slice(0, catJobs.length).flatMap((r) => (r.status === "fulfilled" ? ((r.value.data as z.infer<typeof catSchema>).categories) : []));
   const q = rest[catJobs.length];
   const c = a.hasCode ? rest[catJobs.length + 1] : undefined;
+  const cv = a.designRules ? rest[catJobs.length + 1 + (a.hasCode ? 1 : 0)] : undefined;
   const data = {
     ...(overall.value.data as z.infer<typeof overallSchema>),
     categories: cats,
     questions: q?.status === "fulfilled" ? (q.value.data as z.infer<typeof questionSchema>).questions : [],
     code_notes: c?.status === "fulfilled" ? (c.value.data as z.infer<typeof codeSchema>).code_notes : [],
+    coverage: cv?.status === "fulfilled" ? (cv.value.data as z.infer<typeof coverageSchema>).coverage : [],
+    // The report must not show 0% coverage when the coverage call itself failed.
+    coverageAssessed: a.designRules ? cv?.status === "fulfilled" : undefined,
   } as z.infer<typeof evalSchema>;
   return { data, provider: overall.value.provider, model: `${overall.value.model} (in parts)` };
 }
@@ -393,7 +423,10 @@ type TimedTurnRow = Turn & { created_at?: string };
 export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[], ctx: EvaluationContext): Promise<InterviewReport> {
   const pairs = pairTurns(turns);
   const rubric = RUBRICS[iv.kind];
-  const candTurns = turns.filter((t) => t.role === "candidate").map((t) => ({ content: t.content, created_at: t.created_at ?? iv.started_at }));
+  const candTurns = turns.filter((t) => t.role === "candidate").map((t) => ({ content: t.content, board: t.board ?? null, created_at: t.created_at ?? iv.started_at }));
+  const isDesign = iv.kind === "hld";
+  const level = designLevel(iv.difficulty);
+  const anchorsOf = (id: string) => anchorsFor(id, { kind: iv.kind, level });
   const comm = communicationStats(pairs.map((p) => p.answer));
 
   const transcript = pairs.map((p) =>
@@ -401,7 +434,7 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
   ).join("\n\n");
 
   const rubricLines = rubric.flatMap((r) => {
-    const a = anchorsFor(r.id);
+    const a = anchorsOf(r.id);
     return [`- ${r.id}: ${r.name}${isCore(iv.kind, r.id) ? " (CORE)" : ""} — ${r.desc}`, ...a.map((x, i) => `    ${i + 1} = ${x}`)];
   });
 
@@ -418,6 +451,15 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
     : "code_notes: [] (no code in this round).";
   const commsRule = "Communication: judge structure, relevance, clarity and conciseness only. Do NOT comment on accent, voice, personality, intelligence or honesty.";
   const noVerdict = "Do NOT give an overall verdict or hiring recommendation; the platform computes it from your category scores.";
+  const checklist = isDesign ? ctx.design?.checklist ?? [] : [];
+  const designRules = isDesign ? [
+    `Level: score against the ${DESIGN_LEVEL_LABEL[level]} anchors below.`,
+    "Whiteboard: the candidate's diagram appears in the transcript as lines like \"[n:abc123] Redis cache\" and \"[e:def456] API -> Redis (cache-aside)\". Evidence may cite such a line copied exactly (id and text) — especially for architecture.",
+    ...(checklist.length ? [
+      "coverage: the must-cover checklist for this case is below. For each item the candidate actually covered, return {id, evidence} where evidence is ONE short exact quote from their answers or ONE whiteboard line copied exactly. Omit items they did not cover. Never infer coverage.",
+      ...checklist.map((c) => `  - ${c.id}: ${c.item}`),
+    ] : ["coverage: [] (no checklist for this round)."]),
+  ] : [];
   const context: ChatMessage[] = [
     { role: "user", content: untrusted("interview_transcript", transcript) },
     ...(ctx.facts ? [{ role: "user" as const, content: `Objective facts recorded by the platform (code judge results, hints, editor events, timings) — use them, they are not candidate claims:\n${untrusted("platform_facts", ctx.facts)}` }] : []),
@@ -434,8 +476,8 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
           ...intro, scoringRule, ...rubricLines, evidenceRule,
           "For each question index, list what was correct / incomplete / technically incorrect / missing, describe what a strong answer would contain, suggest a better answer structure, topics to study, and realistic follow-ups.",
           "drills: exactly 3 practice drills targeting the weakest areas, each {title, how (specific steps), minutes, kind}; kind is one of dsa, lesson, quiz, system_design, project, mock, revision, resume.",
-          codeRule, commsRule, noVerdict,
-          "Return JSON with keys: summary, categories[{id,score,evidence,comment,fix}], questions[{index,...}], strengths, weaknesses, mistakes, missed_concepts, drills, code_notes, communication_comment.",
+          codeRule, commsRule, noVerdict, ...designRules,
+          `Return JSON with keys: summary, categories[{id,score,evidence,comment,fix}], questions[{index,...}], strengths, weaknesses, mistakes, missed_concepts, drills, code_notes, communication_comment${isDesign ? ", coverage[{id,evidence}]" : ""}.`,
         ].join("\n"),
       },
       ...context,
@@ -445,7 +487,7 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
     // The one big call failed (busy free tier, truncated output): retry as several small calls.
     console.info("[eval] full evaluation failed, retrying in chunks:", e instanceof Error ? e.message : e);
     ctx.onStage?.("The free AI tier was busy — scoring in smaller pieces instead");
-    ({ data, provider, model } = await chunkedEvaluation({ iv, rubric, rubricLinesFor: (ids) => rubric.filter((r) => ids.includes(r.id)).flatMap((r) => rubricLines.slice(rubricLines.findIndex((l) => l.startsWith(`- ${r.id}:`)), rubricLines.findIndex((l) => l.startsWith(`- ${r.id}:`)) + 5)), intro, scoringRule, evidenceRule, codeRule, commsRule, noVerdict, context, hasCode: Boolean(code), onStage: ctx.onStage }));
+    ({ data, provider, model } = await chunkedEvaluation({ iv, rubric, rubricLinesFor: (ids) => rubric.filter((r) => ids.includes(r.id)).flatMap((r) => rubricLines.slice(rubricLines.findIndex((l) => l.startsWith(`- ${r.id}:`)), rubricLines.findIndex((l) => l.startsWith(`- ${r.id}:`)) + 5)), intro, scoringRule, evidenceRule, codeRule, commsRule, noVerdict, context, hasCode: Boolean(code), onStage: ctx.onStage, designRules: checklist.length ? designRules : undefined }));
   }
 
   // Evidence must be real (and gets a timestamp); a category with a score but no surviving evidence is unscored.
@@ -453,15 +495,16 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
   const judged = ctx.coding ? judgeCorrectness(ctx.coding) : null;
   const categories: ReportCategory[] = rubric.map((r) => {
     const c = data.categories.find((x) => x.id === r.id);
-    const anchors = anchorsFor(r.id);
+    const anchors = anchorsOf(r.id);
     const base = { ...r, core: isCore(iv.kind, r.id), weight: weightOf(iv.kind, r.id), anchors, comment: c?.comment ?? "", fix: c?.fix ?? "" };
     if (iv.kind === "dsa" && r.id === "correctness" && judged) {
       return { ...base, score: judged.score, anchor: anchors[judged.score - 1], evidence: [{ text: judged.evidence, at: null }], source: "judge" as const };
     }
     const evidence: Evidence[] = [];
     for (const q of c?.evidence ?? []) {
-      const hit = locateQuote(q, candTurns, iv.started_at);
-      if (hit.found) evidence.push({ text: q, at: hit.at }); else dropped++;
+      // System design: a whiteboard element the candidate actually drew also counts as evidence.
+      const hit = isDesign ? verifyDesignEvidence(q, candTurns, iv.started_at) : { ...locateQuote(q, candTurns, iv.started_at), kind: "quote" as const };
+      if (hit.found) evidence.push({ text: q, at: hit.at, ...(hit.kind === "board" ? { kind: "board" as const } : {}) }); else dropped++;
     }
     const score = c?.score != null && evidence.length > 0 ? c.score : null;
     return { ...base, score, anchor: score ? anchors[score - 1] : null, evidence, source: "ai" as const };
@@ -483,6 +526,22 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
     : null;
   const notes = code ? validateCodeNotes(code.source, data.code_notes) : null;
 
+  let design: DesignReport | undefined;
+  if (isDesign) {
+    const coverage = checklist.length ? scoreCoverage(checklist, data.coverage, candTurns, iv.started_at) : null;
+    if (coverage) dropped += coverage.dropped;
+    design = {
+      ...(ctx.design?.case ? { case: ctx.design.case } : {}),
+      level, levelLabel: DESIGN_LEVEL_LABEL[level],
+      // "assessed" is false when the evaluator never returned coverage (e.g. a failed part of a chunked run).
+      coverage: coverage ? { ...coverage, assessed: (data as { coverageAssessed?: boolean }).coverageAssessed !== false } : null,
+      redFlags: designRedFlags(candTurns),
+      ...(ctx.design?.curveball ? { curveball: ctx.design.curveball } : {}),
+      phasesReached: ctx.design?.phasesReached ?? [],
+      board: [...candTurns].reverse().find((t) => t.board)?.board ?? undefined,
+    };
+  }
+
   return {
     version: 2,
     scale: 4,
@@ -501,5 +560,6 @@ export async function evaluateInterview(iv: InterviewRow, turns: TimedTurnRow[],
     ...(code && notes ? { code: { language: code.language, source: code.source, notes: notes.notes, dropped: notes.dropped } } : {}),
     evidence_dropped: dropped,
     provider, model,
+    ...(design ? { design, rubric: "hld-v2" as const } : {}),
   };
 }

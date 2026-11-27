@@ -110,13 +110,17 @@ export const RUBRICS: Record<KindId, { id: string; name: string; desc: string }[
     { id: "code_quality", name: "Code quality", desc: "Readable, well-named, idiomatic code" },
     { id: "communication", name: "Communication", desc: "Thought aloud clearly and structured explanations" },
   ],
+  // System design rubric v2 (level-calibrated anchors in lib/interview/rubric.ts → HLD_ANCHORS).
   hld: [
-    { id: "requirements", name: "Requirements gathering", desc: "Functional and non-functional requirements clarified" },
-    { id: "estimation", name: "Capacity estimation", desc: "Reasonable traffic/storage estimates used to drive decisions" },
-    { id: "architecture", name: "Architecture", desc: "Coherent components, APIs and data model" },
-    { id: "scaling", name: "Scaling & reliability", desc: "Caching, sharding, replication, queues, failure handling" },
-    { id: "tradeoffs", name: "Trade-offs", desc: "Compared alternatives and justified choices" },
-    { id: "communication", name: "Communication", desc: "Structured, drove the discussion" },
+    { id: "requirements", name: "Requirements", desc: "Functional and non-functional requirements clarified, with numbers" },
+    { id: "estimation", name: "Estimation", desc: "Traffic/storage estimates that drive later choices" },
+    { id: "api_data", name: "API & data model", desc: "Main endpoints and a data model fitted to the access patterns" },
+    { id: "architecture", name: "Architecture", desc: "Coherent components and request flow (scored partly from the whiteboard)" },
+    { id: "deep_dive", name: "Deep dive", desc: "Depth on the component the interviewer chose" },
+    { id: "scaling", name: "Scaling & reliability", desc: "Caching, sharding, replication, failure handling where the numbers need it" },
+    { id: "tradeoffs", name: "Trade-offs", desc: "Named the alternative and what was given up" },
+    { id: "operations", name: "Operations", desc: "Monitoring, failure handling, rollout, security basics" },
+    { id: "communication", name: "Communication", desc: "Drove the discussion and used the whiteboard" },
   ],
   lld: [
     { id: "requirements", name: "Requirements", desc: "Clarified scope and use cases" },

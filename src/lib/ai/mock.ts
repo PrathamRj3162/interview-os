@@ -87,6 +87,15 @@ function mockReplyJson(messages: ChatMessage[], system: string): string {
       questions: answers.map((a) => ({ index: Number(a[1]), correct: ["Gave a direct answer"], missing: ["Trade-offs"], strong_answer: "Mock strong answer.", study: ["Mock topic"] })),
       strengths: ["Clear structure"], weaknesses: ["Limited depth"], mistakes: [], missed_concepts: ["k-fold cross-validation"],
       communication_comment: "Mock communication comment.",
+      // System design: claim one checklist item with a real whiteboard line (verifiable) and one with a fabricated quote (dropped).
+      coverage: (() => {
+        const items = [...system.matchAll(/^ {2}- ([a-z0-9_-]+): /gm)].map((m) => m[1]);
+        const boardLine = /^\[n:[A-Za-z0-9_-]{1,6}\] .+$/m.exec(transcript)?.[0];
+        return [
+          ...(items[0] && boardLine ? [{ id: items[0], evidence: boardLine }] : []),
+          ...(items[1] ? [{ id: items[1], evidence: "a sentence the candidate never said at all" }] : []),
+        ];
+      })(),
     });
   }
 

@@ -45,7 +45,7 @@ test("HLD room: whiteboard is sent with the answer as text and autosaved", async
   page.on("requestfailed", (r) => { if (/\.woff2/.test(r.url())) console.log("[font-failed]", r.failure()?.errorText, r.url().slice(0, 110)); });
   page.on("request", (r) => { if (/\.(woff2?|ttf)(\?|$)/.test(r.url())) fontHosts.add(new URL(r.url()).host); });
 
-  const { data: iv } = await admin().from("mock_interviews").insert({ user_id: userId, kind: "hld", difficulty: "medium", persona: "architect", mode: "practice", input_mode: "text", duration_min: 45, topic: "Design: URL shortener" }).select("id").single();
+  const { data: iv } = await admin().from("mock_interviews").insert({ user_id: userId, kind: "hld", difficulty: "medium", persona: "architect", mode: "practice", input_mode: "text", duration_min: 45, topic: "Design: URL shortener", design_case: "url-shortener", phase: "requirements" }).select("id").single();
   await login(page);
   await page.goto(`/interview/${iv!.id}`);
   await expect(page.getByTestId("whiteboard")).toBeVisible();
@@ -68,7 +68,7 @@ test("HLD room: whiteboard is sent with the answer as text and autosaved", async
   await expect.poll(async () => {
     const { data } = await admin().from("interview_turns").select("board").eq("interview_id", iv!.id).eq("role", "candidate").not("board", "is", null);
     return data?.[0]?.board ?? "";
-  }, { timeout: 30_000 }).toMatch(/\[n:\w+\] API servers[\s\S]*\[n:\w+\] Redis cache[\s\S]*Edges:\n\[e:[\w-]+\] API servers -> Redis cache/);
+  }, { timeout: 30_000 }).toMatch(/\[n:[\w-]+\] API servers[\s\S]*\[n:[\w-]+\] Redis cache[\s\S]*Edges:\n\[e:[\w-]+\] API servers -> Redis cache/);
 
   // Autosave restores the drawing after a reload.
   await expect.poll(async () => {
@@ -79,6 +79,19 @@ test("HLD room: whiteboard is sent with the answer as text and autosaved", async
   await expect(page.getByTestId("board-counts")).toHaveText("(2 boxes, 1 arrows)", { timeout: 30_000 });
 
   expect(csp, csp.join("\n")).toEqual([]);
+
+  // End → report: level, coverage from VERIFIED evidence (the mock cites one real board line and one invented
+  // quote: only the board line counts), red flags, and the final board.
+  await page.getByRole("button", { name: "End", exact: true }).click();
+  await page.getByRole("button", { name: "Yes, end" }).click();
+  await expect(page).toHaveURL(/\/report$/, { timeout: 60_000 });
+  const d = page.getByTestId("design-report");
+  await expect(d).toContainText("SDE-1 bar");
+  await expect(d.getByTestId("coverage-score")).toHaveText(/^\d+%$/);
+  expect(Number((await d.getByTestId("coverage-score").textContent())!.replace("%", ""))).toBeGreaterThan(0);
+  await expect(d.getByText(/board: \[n:[\w-]+\]/)).toBeVisible();
+  await expect(d.getByText(/coverage claim\(s\) cited text that isn't in your answers/)).toBeVisible();
+  await expect(d.getByTestId("red-flags")).toContainText("No numbers");
   for (const h of fontHosts) expect(h).toBe("localhost:3000"); // fonts come from our own origin, not a CDN
 });
 

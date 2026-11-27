@@ -1,3 +1,5 @@
+import { CASE_BY_SLUG } from "@/lib/learn/design";
+import { DESIGN_PHASE_LABELS, type DesignPhase } from "@/lib/interview/design-phases";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser, createAdminClient } from "@/lib/supabase/server";
 import { AIUnavailableError } from "@/lib/ai";
@@ -119,6 +121,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         `Sample runs: ${dsaReport.browserRuns + dsaReport.judgeRuns}. Hints used: ${dsaReport.hintsUsed}/3. Large pastes into the editor: ${dsaReport.pastes.length}.`,
         `Phases reached: ${dsaReport.phasesReached.join(" → ")}.`,
         ctx.metrics.coding ? `Timeline: first run at ${ctx.metrics.coding.firstRunMin ?? "—"} min, first submit at ${ctx.metrics.coding.firstSubmitMin ?? "—"} min, accepted at ${ctx.metrics.coding.acceptedMin ?? "never"} min.` : "",
+      ].filter(Boolean).join("\n");
+    }
+    if (iv.kind === "hld") {
+      const phaseEvents = (await loadEvents(supabase, id)).filter((e) => e.type === "phase");
+      const c = iv.design_case ? CASE_BY_SLUG[iv.design_case] : undefined;
+      const curveball = phaseEvents.map((e) => e.payload.curveball).find((x): x is string => typeof x === "string");
+      const reached = [...new Set(["requirements", ...phaseEvents.map((e) => String(e.payload.to))])];
+      ctx.design = {
+        ...(c ? { case: { slug: c.slug, title: c.title } } : {}),
+        checklist: c?.checklist ?? [], ...(curveball ? { curveball } : {}),
+        phasesReached: reached.map((p) => DESIGN_PHASE_LABELS[p as DesignPhase] ?? p),
+      };
+      facts = [
+        c ? `Design case: ${c.title} — ${c.prompt}` : "",
+        `Phases reached (moved on by the server's timer or by the interviewer): ${ctx.design.phasesReached.join(" → ")}.`,
+        curveball ? `Curveball given in the curveball phase: ${curveball}` : "The curveball phase was not reached.",
       ].filter(Boolean).join("\n");
     }
     ctx.facts = facts;

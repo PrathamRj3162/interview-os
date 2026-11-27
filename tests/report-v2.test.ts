@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { computeVerdict, baseLevel, pickOneThing, toPercent, type VerdictCategory } from "@/lib/interview/verdict";
 import { computeMetrics, locateQuote, validateCodeNotes, numberLines, median, fmtClock } from "@/lib/interview/metrics";
-import { ANCHORS, CORE, anchorsFor, weightOf } from "@/lib/interview/rubric";
+import { ANCHORS, CORE, HLD_ANCHORS, anchorsFor, designLevel, weightOf } from "@/lib/interview/rubric";
 import { RUBRICS } from "@/lib/interview/config";
 import { toView } from "@/lib/interview/report-view";
 
@@ -11,12 +11,26 @@ describe("rubric anchors", () => {
   it("every category of every round has 4 written anchors, and core ids exist in that round", () => {
     for (const [kind, cats] of Object.entries(RUBRICS)) {
       for (const c of cats) {
-        expect(ANCHORS[c.id], `${kind}.${c.id}`).toBeDefined();
+        if (kind !== "hld") expect(ANCHORS[c.id], `${kind}.${c.id}`).toBeDefined();
+        else expect(HLD_ANCHORS[c.id], `hld.${c.id}`).toBeDefined();
         expect(anchorsFor(c.id)).toHaveLength(4);
       }
       for (const id of CORE[kind as keyof typeof CORE]) expect(cats.map((c) => c.id), `${kind} core ${id}`).toContain(id);
     }
     expect(weightOf("dsa", "correctness")).toBe(2);
+    expect(weightOf("hld", "deep_dive")).toBe(2);
+  });
+  it("HLD v2: two distinct anchor sets per category, chosen by difficulty", () => {
+    for (const [id, sets] of Object.entries(HLD_ANCHORS)) {
+      expect(sets.sde1, id).toHaveLength(4); expect(sets.sde2, id).toHaveLength(4);
+      expect(sets.sde1.slice(1), id).not.toEqual(sets.sde2.slice(1));
+      expect(anchorsFor(id, { kind: "hld", level: "sde2" })).toEqual(sets.sde2);
+    }
+    expect(designLevel("medium")).toBe("sde1");
+    expect(designLevel("hard")).toBe("sde2");
+    expect(designLevel("expert")).toBe("sde2");
+    // Other rounds keep their single anchor set even for shared ids.
+    expect(anchorsFor("requirements", { kind: "lld" })).toEqual(ANCHORS.requirements);
     expect(weightOf("dsa", "communication")).toBe(1);
   });
 });
