@@ -51,6 +51,12 @@ describe("content registry", () => {
     expect(new Set(items.map((i) => i.meta.id)).size).toBe(items.length);
     for (const i of items) { expect(i.meta.id.startsWith(`${i.meta.type}:`)).toBe(true); expect(i.meta.version).toBeGreaterThanOrEqual(1); }
   });
+  it("design library: 24 cases (20 HLD + 4 LLD), every one passing its checks, new ones shipped as draft", () => {
+    const cases = items.filter((i) => i.meta.type === "design-case");
+    expect(cases).toHaveLength(24);
+    for (const i of cases) for (const c of i.checks) expect(c.ok, `${i.meta.id}: ${c.name} ${c.detail ?? ""}`).toBe(true);
+    expect(cases.filter((i) => i.meta.status === "draft")).toHaveLength(12);
+  });
   it("every live item passes its automated checks (same checks /review shows)", () => {
     for (const i of items.filter((x) => x.meta.status === "live")) for (const c of i.checks) expect(c.ok, `${i.meta.id}: ${c.name} ${c.detail ?? ""}`).toBe(true);
   });

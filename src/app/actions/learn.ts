@@ -29,6 +29,22 @@ export async function markProgress(input: z.input<typeof progressSchema>): Promi
   return { ok: !error };
 }
 
+const attemptSchema = z.object({ kind: z.enum(["hld", "lld"]), slug: z.string().regex(/^[a-z0-9-]{2,80}$/) });
+
+/** "I've attempted it": unlocks a design case's reference answer (self-reported). Never downgrades "studied". */
+export async function markAttempted(input: z.input<typeof attemptSchema>): Promise<{ ok: boolean }> {
+  const parsed = attemptSchema.safeParse(input);
+  if (!parsed.success) return { ok: false };
+  const { supabase, user } = await getCurrentUser();
+  if (!user) return { ok: false };
+  const { error } = await supabase.from("user_progress").upsert(
+    { user_id: user.id, item_type: parsed.data.kind, item_slug: parsed.data.slug, status: "started", updated_at: new Date().toISOString() },
+    { onConflict: "user_id,item_type,item_slug", ignoreDuplicates: true },
+  );
+  revalidatePath(`/system-design/${parsed.data.slug}`);
+  return { ok: !error };
+}
+
 // ───────────── CS fundamentals quizzes ─────────────
 
 

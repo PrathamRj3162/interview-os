@@ -139,6 +139,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         curveball ? `Curveball given in the curveball phase: ${curveball}` : "The curveball phase was not reached.",
       ].filter(Boolean).join("\n");
     }
+    // Finishing a round on a lab case counts as attempting it (unlocks the case's reference answer).
+    if (iv.design_case && (iv.kind === "hld" || iv.kind === "lld")) {
+      await supabase.from("user_progress").upsert({ user_id: user.id, item_type: iv.kind, item_slug: iv.design_case, status: "started", updated_at: new Date().toISOString() }, { onConflict: "user_id,item_type,item_slug", ignoreDuplicates: true });
+    }
     ctx.facts = facts;
     ctx.onStage = stage;
     stage("Scoring each rubric category against your transcript");

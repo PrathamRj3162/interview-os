@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { CASE_BY_SLUG } from "@/lib/learn/design";
+import { CASE_BY_SLUG, designMeta } from "@/lib/learn/design";
+import { loadGate } from "@/lib/content/gate";
 import { requireUser, getCurrentUser } from "@/lib/supabase/server";
 import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS } from "@/lib/interview/config";
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
@@ -56,7 +57,7 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
   const { problem_slug: chosen, ...fields } = parsed.data;
   const row: Record<string, unknown> = { ...fields, user_id: user.id };
   // A case only applies to design rounds of the same kind; the HLD round starts in its first phase.
-  if (fields.design_case && CASE_BY_SLUG[fields.design_case].kind !== fields.kind) row.design_case = null;
+  if (fields.design_case && (CASE_BY_SLUG[fields.design_case].kind !== fields.kind || !(await loadGate()).visible(designMeta(CASE_BY_SLUG[fields.design_case])))) row.design_case = null;
   if (fields.kind === "hld") row.phase = "requirements";
 
   // The DSA round gets one problem from the bank: the chosen one, or a random fresh one at this difficulty.

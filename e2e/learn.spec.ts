@@ -87,6 +87,11 @@ test("system design lab: reveal sections and practise with a focused topic", asy
   await login(page);
   await page.goto("/system-design");
   await page.getByRole("link", { name: /URL shortener/ }).click();
+  // The reference stays locked until you attempt the case.
+  await expect(page.getByTestId("reference-locked")).toBeVisible();
+  await expect(page.getByText("Back-of-the-envelope estimates")).toHaveCount(0);
+  await expect(page.getByTestId("variants")).toContainText("SDE-2+ version");
+  await page.getByTestId("attempted").click();
   await page.getByText("Back-of-the-envelope estimates").click();
   await expect(page.getByText(/62⁷/)).toBeVisible();
   await page.getByText("Reference architecture diagram").click();

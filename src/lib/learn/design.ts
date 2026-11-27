@@ -4,6 +4,8 @@
  */
 import { contentId, type ContentMeta, type ContentStatus } from "@/lib/content/types";
 import type { ChecklistItem } from "@/lib/interview/design-report";
+import { CASE_EXTRAS } from "./design-extras";
+import { NEW_CASES } from "./design-cases-2";
 
 export type DesignCase = {
   slug: string;
@@ -27,6 +29,10 @@ export type DesignCase = {
   curveballs?: string[];
   /** Weighted must-cover checklist for the live round's coverage score (HLD). */
   checklist?: ChecklistItem[];
+  /** What the round looks like at each level. */
+  variants?: { sde1: string; sde2: string };
+  /** Common mistakes, revealed with the reference answer. */
+  mistakes?: string[];
 };
 
 export const HLD_FRAMEWORK = [
@@ -217,12 +223,20 @@ const BASE_CASES: DesignCase[] = [
   },
 ];
 
+
+/** The original 12 cases (live) with their live-round material merged in, then the newer cases (shipped as draft). */
+const WITH_EXTRAS: DesignCase[] = BASE_CASES.map((bc) => {
+  const x = CASE_EXTRAS[bc.slug];
+  if (!x) return bc;
+  return { ...bc, variants: x.variants, mistakes: x.mistakes, checklist: bc.checklist?.length ? bc.checklist : x.checklist, curveballs: bc.curveballs?.length ? bc.curveballs : x.curveballs };
+});
+
 /** A draft case that exists only on the local E2E server (E2E_FIXTURES=1), so review-gate tests never touch real content. */
 const E2E_FIXTURE: DesignCase[] = process.env.E2E_FIXTURES === "1"
-  ? [{ ...BASE_CASES[0], slug: "e2e-fixture", title: "E2E fixture case", status: "draft" }]
+  ? [{ ...WITH_EXTRAS[0], slug: "e2e-fixture", title: "E2E fixture case", status: "draft" }]
   : [];
 
-export const DESIGN_CASES: DesignCase[] = [...BASE_CASES, ...E2E_FIXTURE];
+export const DESIGN_CASES: DesignCase[] = [...WITH_EXTRAS, ...NEW_CASES, ...E2E_FIXTURE];
 
 export const CASE_BY_SLUG: Record<string, DesignCase> = Object.fromEntries(DESIGN_CASES.map((c) => [c.slug, c]));
 

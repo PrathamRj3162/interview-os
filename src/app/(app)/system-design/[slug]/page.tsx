@@ -12,6 +12,8 @@ import { MarkReadButton } from "@/components/learn/mark-read";
 import { DESIGN_DIAGRAMS } from "@/lib/learn/design-diagrams";
 import { DesignDiagram } from "@/components/learn/design-diagram";
 import { Sketchpad } from "@/components/learn/sketchpad";
+import { AttemptButton } from "@/components/learn/attempt-button";
+import { Lock } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   return { title: CASE_BY_SLUG[(await params).slug]?.title ?? "Design case" };
@@ -36,6 +38,8 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
   const meta = designMeta(c);
   if (!gate.visible(meta)) notFound();
   const { data: p } = await supabase.from("user_progress").select("status").eq("user_id", user.id).eq("item_type", c.kind).eq("item_slug", slug).maybeSingle();
+  // The reference answer stays hidden until you've attempted the case: finished a round on it, or said so yourself.
+  const attempted = Boolean(p);
   const practice = `/interview/new?kind=${c.kind}&persona=architect&case=${slug}&topic=${encodeURIComponent(`Design: ${c.title} — ${c.prompt}`)}`;
   return (
     <article className="space-y-5">
@@ -58,6 +62,18 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
       </details>
       <Section title="Functional requirements" items={c.functional} />
       <Section title="Non-functional requirements" items={c.nonFunctional} />
+      {c.variants && (
+        <div className="grid gap-3 md:grid-cols-2" data-testid="variants">
+          <Card className="p-4"><p className="text-xs font-medium text-muted">SDE-1 version</p><p className="mt-1 text-sm">{c.variants.sde1}</p></Card>
+          <Card className="p-4"><p className="text-xs font-medium text-muted">SDE-2+ version</p><p className="mt-1 text-sm">{c.variants.sde2}</p></Card>
+        </div>
+      )}
+      {!attempted ? (
+        <Card className="flex flex-wrap items-center justify-between gap-3 p-4" data-testid="reference-locked">
+          <p className="flex items-center gap-2 text-sm"><Lock className="size-4 text-muted" aria-hidden />The reference answer, diagram, checklist and common mistakes unlock after you attempt this case: finish a practice round on it, or design it yourself first.</p>
+          <AttemptButton kind={c.kind} slug={slug} />
+        </Card>
+      ) : (<>
       <Section title="Back-of-the-envelope estimates" items={c.estimates} />
       <Section title={c.kind === "hld" ? "API" : "Key methods"} items={c.api} />
       <Section title={c.kind === "hld" ? "Data model" : "Entities"} items={c.data} />
@@ -71,6 +87,9 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
       <Section title="Deep dives" items={c.deepDives} />
       <Section title="Trade-offs" items={c.tradeoffs} />
       <Section title="Follow-ups an interviewer may ask" items={c.followUps} />
+      <Section title="Common mistakes" items={c.mistakes} />
+      <Section title="What interviewers check (the must-cover list)" items={c.checklist?.map((x) => `${x.item} (weight ${x.weight})`)} />
+      </>)}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">A reference answer written for Interview OS — other designs can be just as good if the trade-offs are argued well.</p>
         <ReportButton itemId={meta.id} version={meta.version} title={c.title} />

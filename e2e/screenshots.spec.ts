@@ -34,7 +34,7 @@ test("capture screenshots", async ({ page }) => {
   await page.getByText("How the score was calculated").scrollIntoViewIfNeeded(); await shot("resume-report");
   await page.goto("/interview/new"); await page.getByRole("button", { name: /^Next/ }).waitFor(); await shot("interview-setup");
   await page.goto("/dashboard"); await page.getByText("Recommended next step").waitFor(); await shot("dashboard");
-  await page.goto("/system-design/url-shortener"); await page.getByText("Reference architecture diagram").click();
+  await page.goto("/system-design/url-shortener"); await page.getByTestId("attempted").click(); await page.getByText("Reference architecture diagram").click();
   await page.getByTestId("design-diagram").scrollIntoViewIfNeeded(); await shot("system-design");
   // DSA round: opening is deterministic (no AI call); Run happens in the browser.
   await page.goto("/interview/new?kind=dsa");
