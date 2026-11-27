@@ -1,0 +1,157 @@
+{
+ "splitwise": {
+  "sample": "b owes a: 100.00\nc owes a: 100.00\nb owes a: 30.00\nc owes a: 100.00",
+  "tests": {
+   "equal split with remainder": "b owes a: 33.33\nc owes a: 33.33",
+   "netting both ways": "a owes b: 15.00\na owes b: 7.50",
+   "exact split and per-user view": "y owes x: 30.50\ny owes z: 10.00\ny owes x: 30.50\nz owes x: 49.50\ny owes z: 10.00\nz owes x: 49.50",
+   "validation": "ERROR unknown user c\nERROR invalid amount\nERROR amounts do not add up\nERROR unknown user q\nNo balances\nNo balances",
+   "many expenses": "u2 owes u1: 100.00\nu3 owes u1: 50.00\nu3 owes u2: 40.00\nu4 owes u1: 97.50\nu4 owes u2: 32.50\nu4 owes u3: 49.99",
+   "percent split": "b owes a: 300.00\nc owes a: 200.00",
+   "percent rounding": "a owes b: 33.33\nc owes b: 33.34",
+   "percent validation": "ERROR percents do not add up to 100\nb owes a: 40.00"
+  }
+ },
+ "parking-lot": {
+  "sample": "Created 1 floors with 4 slots each\nTICKET F1-S4\nTICKET F1-S2\nFULL\nF1: 0 free\nUnparked KA01",
+  "tests": {
+   "allocation order across floors": "Created 2 floors with 5 slots each\nTICKET F1-S4\nTICKET F1-S5\nTICKET F2-S4\nTICKET F2-S5\nFULL\nTICKET F1-S1\nTICKET F1-S2\nF1: 0 free\nF2: 0 free\nF1: 1 free\nF2: 2 free",
+   "unpark frees the lowest slot again": "Created 1 floors with 6 slots each\nTICKET F1-S4\nTICKET F1-S5\nTICKET F1-S6\nUnparked b\nTICKET F1-S5\nF1: 0 free\nUnparked d\nERROR invalid ticket",
+   "errors": "ERROR no lot\nERROR no lot\nCreated 1 floors with 3 slots each\nERROR invalid type\nERROR invalid ticket\nFULL\nTICKET F1-S2\nTICKET F1-S3\nFULL",
+   "trucks": "Created 3 floors with 4 slots each\nTICKET F1-S1\nTICKET F2-S1\nTICKET F3-S1\nFULL\nUnparked t2\nTICKET F2-S1\nF1: 0 free\nF2: 0 free\nF3: 0 free",
+   "fees": "Created 1 floors with 5 slots each\nTICKET F1-S4\nTICKET F1-S2\nTICKET F1-S1\nUnparked a\nFEE 60\nUnparked b\nFEE 10\nUnparked t\nFEE 100",
+   "invalid hours keeps the vehicle": "Created 1 floors with 4 slots each\nTICKET F1-S4\nERROR invalid hours\nF1: 0 free\nUnparked a\nFEE 100"
+  }
+ },
+ "tic-tac-toe": {
+  "sample": "Ana placed X at 1 1\nBo placed O at 2 2\nAna placed X at 1 2\nBo placed O at 3 3\nAna placed X at 1 3\nAna won\nXXX\n-O-\n--O",
+  "tests": {
+   "column win": "Ana placed X at 1 2\nBo placed O at 1 1\nAna placed X at 2 2\nBo placed O at 3 3\nAna placed X at 3 2\nAna won\nOX-\n-X-\n-XO",
+   "anti-diagonal win and moves after": "a placed X at 1 1\nb placed O at 1 3\na placed X at 2 1\nb placed O at 2 2\na placed X at 1 2\nb placed O at 3 1\nb won\nERROR game over",
+   "draw": "a placed X at 1 1\nb placed O at 1 2\na placed X at 1 3\nb placed O at 2 2\na placed X at 2 1\nb placed O at 2 3\na placed X at 3 2\nb placed O at 3 1\na placed X at 3 3\nGame drawn\nXOX\nXOO\nOXX",
+   "invalid moves keep the turn": "ERROR invalid move\na placed X at 1 1\nERROR invalid move\nERROR invalid move\nb placed O at 2 2\nX--\n-O-\n---",
+   "4x4 needs a full line": "a placed X at 1 1\nb placed O at 2 1\na placed X at 1 2\nb placed O at 2 2\na placed X at 1 3\nb placed O at 2 3\na placed X at 1 4\na won",
+   "k in a row": "a placed X at 2 2\nb placed O at 1 1\na placed X at 3 3\nb placed O at 1 2\na placed X at 4 4\na won\nOO---\n-X---\n--X--\n---X-\n-----",
+   "k in a row vertical in the middle": "a placed X at 2 3\nb placed O at 1 1\na placed X at 3 3\nb placed O at 1 2\na placed X at 4 3\nb placed O at 6 6\na placed X at 5 3\na won"
+  }
+ },
+ "movie-booking": {
+  "sample": "HOLD H1\nERROR seat A2 unavailable\nBOOKED B1 A1,A2\n4",
+  "tests": {
+   "all-or-nothing holds": "HOLD H1\nERROR seat B2 unavailable\nHOLD H2\n0\nBOOKED B1 A2,B1\n0",
+   "expiry": "HOLD H1\nBOOKED B1 A1\nHOLD H2\n2\nERROR unknown hold\nHOLD H3\n0",
+   "release and unknown": "HOLD H1\n9\nERROR unknown hold\nERROR seat D1 unavailable\nHOLD H2\nBOOKED B1 C3,C1",
+   "two shows": "HOLD H1\nHOLD H2\nBOOKED B1 A1\nBOOKED B2 A1\n1\n1",
+   "row prices": "HOLD H1\nBOOKED B1 A1,A2,B1,C1\nTOTAL 950",
+   "price updates before confirm": "HOLD H1\nBOOKED B1 B1\nTOTAL 90\nHOLD H2\nBOOKED B2 A1,A2\nTOTAL 300"
+  }
+ },
+ "cab-booking": {
+  "sample": "RIDE R1 d2\nFARE 50.00\nR1 d2 50.00",
+  "tests": {
+   "nearest within radius": "RIDE R1 d1\nRIDE R2 d2\nNO_DRIVER\nFARE 50.00\nFARE 127.28",
+   "tie goes to the smaller id and busy drivers are skipped": "RIDE R1 a\nRIDE R2 b\nFARE 14.14\nRIDE R3 b\nFARE 50.00\nFARE 50.00",
+   "driver moves to the destination": "RIDE R1 d\nNO_DRIVER\nFARE 254.56\nRIDE R2 d\nFARE 14.14\nR2 d 14.14\nR1 d 254.56\nNo rides",
+   "surge": "RIDE R1 d\nFARE 50.00\nRIDE R2 d\nFARE 0.00\nRIDE R3 d\nFARE 150.00\nR1 d 50.00\nR2 d 0.00\nR3 d 150.00"
+  }
+ },
+ "food-ordering": {
+  "sample": "ORDER O1 r2 140\nORDER O2 r2 70\nORDER O3 r1 80",
+  "tests": {
+   "price then capacity": "ORDER O1 b 40\nORDER O2 a 80\nNO_RESTAURANT\nNO_RESTAURANT",
+   "delivery frees capacity": "ORDER O1 r 30\nNO_RESTAURANT\nORDER O2 r 10\nERROR unknown order",
+   "ties by rating then id": "ORDER O1 y 100\nORDER O2 y 20\nNO_RESTAURANT",
+   "rating strategy": "ORDER O1 b 150\nORDER O2 a 200\nORDER O3 a 200\nORDER O4 b 150\nNO_RESTAURANT"
+  }
+ },
+ "issue-resolution": {
+  "sample": "ASSIGNED i1 a1\nASSIGNED i2 a2\nWAITING i3\nRESOLVED i1\nASSIGNED i3 a1\ni1",
+  "tests": {
+   "assignment and queue": "ASSIGNED i1 a1\nASSIGNED i2 a2\nWAITING i3\nWAITING i4\nRESOLVED i2\nASSIGNED i4 a2\nRESOLVED i1\nASSIGNED i3 a1\ni1\ni2",
+   "agent takes the oldest issue they can handle": "ASSIGNED x a\nWAITING y\nWAITING z\nRESOLVED x\nASSIGNED z a\nRESOLVED z\nx,z",
+   "errors": "ERROR cannot resolve nope\nASSIGNED i a\nRESOLVED i\nERROR cannot resolve i\ni\nNone",
+   "leave": "ASSIGNED i1 a1\nASSIGNED i2 a2\nWAITING i3\nWAITING i1\nRESOLVED i2\nASSIGNED i1 a2\nRESOLVED i1\nASSIGNED i3 a2\ni2,i1",
+   "leave while idle": "ASSIGNED i1 b\nWAITING i2\nRESOLVED i1\nASSIGNED i2 b"
+  }
+ },
+ "pub-sub": {
+  "sample": "s1 <- o1\ns2 <- o1\ns2 <- o2",
+  "tests": {
+   "ordered delivery": "c <- hello\na <- hello\nb <- hello\nc <- second message here\na <- second message here\nb <- second message here",
+   "errors and empty topics": "(no subscribers)\nERROR unknown topic nope\nERROR unknown topic nope\n(no subscribers)",
+   "several topics": "s1 <- m1\ns1 <- m2\ns2 <- m2\ns2 <- m3",
+   "replay": "a <- m0\na <- m1\na <- m2\nz <- m1\nz <- m2\n(nothing to replay)\na <- m0\na <- m1\na <- m2"
+  }
+ },
+ "rate-limiter": {
+  "sample": "ALLOW\nALLOW\nDENY\nALLOW",
+  "tests": {
+   "window boundaries": "ALLOW\nALLOW\nALLOW\nDENY\nALLOW\nALLOW\nALLOW",
+   "clients are independent": "ALLOW\nALLOW\nDENY\nALLOW\nDENY\nALLOW\nALLOW",
+   "new rule resets": "ALLOW\nDENY\nALLOW\nALLOW\nDENY",
+   "sliding window": "ALLOW\nALLOW\nDENY\nDENY\nALLOW\nDENY\nALLOW",
+   "fixed vs sliding at the edge": "ALLOW\nALLOW\nALLOW\nALLOW\nALLOW\nALLOW\nDENY\nDENY"
+  }
+ },
+ "task-scheduler": {
+  "sample": "RUNNING b\nWAITING 1\nt=2 DONE b\nt=5 DONE a",
+  "tests": {
+   "priority then fifo": "t=1 DONE b\nt=2 DONE c\nt=3 DONE d\nt=5 DONE a",
+   "no preemption": "RUNNING long\nWAITING 1\nt=5 DONE long\nRUNNING urgent\nWAITING 0\nt=6 DONE urgent\nIDLE\nWAITING 0",
+   "idle worker and boundaries": "IDLE\nWAITING 0\nt=5 DONE x\nRUNNING y\nWAITING 0\nt=6 DONE y",
+   "dependencies": "ERROR unknown dependency\nt=1 DONE lint\nt=3 DONE build\nt=4 DONE test\nt=5 DONE ship",
+   "waiting count includes blocked tasks": "RUNNING a\nWAITING 1\nt=3 DONE a\nt=4 DONE b\nIDLE\nWAITING 0"
+  }
+ },
+ "kv-transactions": {
+  "sample": "20\n10\n1",
+  "tests": {
+   "basics and count": "2\n1\nNULL\n2\n0",
+   "commit and rollback": "1\nNULL\n0\n1\n1\nNO TRANSACTION\nNO TRANSACTION",
+   "nested is an error by default": "ERROR nested\nNULL\nNO TRANSACTION",
+   "nested transactions": "30\n20\n0\nNULL\nNO TRANSACTION",
+   "nested rollback restores counts": "0\n1\n2\n0"
+  }
+ },
+ "vending-machine": {
+  "sample": "BALANCE 10\nBALANCE 20\nDISPENSE chips\nCHANGE 5\nSOLD OUT",
+  "tests": {
+   "change and balance": "BALANCE 20\nDISPENSE chips\nCHANGE 5\nBALANCE 10\nBALANCE 15\nDISPENSE chips\nCHANGE 0\nSOLD OUT",
+   "insufficient funds keeps balance": "BALANCE 10\nINSUFFICIENT FUNDS 15\nBALANCE 30\nDISPENSE water\nCHANGE 5\nREFUND 0",
+   "errors": "ERROR invalid coin\nUNKNOWN PRODUCT\nBALANCE 2\nSOLD OUT\nDISPENSE gum\nCHANGE 0\nREFUND 0",
+   "limited change": "BALANCE 20\nDISPENSE chips\nCHANGE 5\nBALANCE 20\nEXACT CHANGE ONLY\nREFUND 20\nBALANCE 10\nBALANCE 15\nDISPENSE chips\nCHANGE 0",
+   "greedy change from inserted coins": "BALANCE 10\nBALANCE 12\nBALANCE 13\nDISPENSE tea\nCHANGE 1\nBALANCE 20\nEXACT CHANGE ONLY\nREFUND 20"
+  }
+ },
+ "meeting-rooms": {
+  "sample": "BOOKED M1 r1\nBOOKED M2 r2\n60-120 ana",
+  "tests": {
+   "smallest fitting room": "BOOKED M1 small\nBOOKED M2 mid\nBOOKED M3 big\nNO_ROOM\nNO_ROOM",
+   "touching intervals don't overlap": "BOOKED M1 r\nBOOKED M2 r\nBOOKED M3 r\nNO_ROOM\n0-60 c\n60-120 a\n120-180 b",
+   "cancel and errors": "BOOKED M1 r\nBOOKED M2 r\nERROR unknown booking\nERROR invalid time\n10-20 b\nFree",
+   "id tie and schedule order": "BOOKED M1 a\nBOOKED M2 a\nBOOKED M3 b\n0-50 y\n100-200 x\n150-250 z",
+   "daily bookings": "BOOKED M1 r1\nBOOKED M2,M3,M4 r2\nNO_ROOM\n1500-1560 a\n60-120 b\n1500-1560 b\n2940-3000 b"
+  }
+ },
+ "snake-ladder": {
+  "sample": "Ana rolled 3 and moved from 0 to 3 — ladder to 15\nBo rolled 5 and moved from 0 to 5\nAna rolled 3 and moved from 15 to 18 — snake to 2\nBo rolled 2 and moved from 5 to 7",
+  "tests": {
+   "turns, snakes and ladders": "a rolled 2 and moved from 0 to 2 — ladder to 21\nb rolled 6 and moved from 0 to 6\na rolled 6 and moved from 21 to 27 — snake to 1\nb rolled 4 and moved from 6 to 10\na rolled 6 and moved from 1 to 7\nb rolled 2 and moved from 10 to 12",
+   "overshoot and win": "a rolled 6 and moved from 0 to 6\na rolled 6 and moved from 6 to 6\na rolled 3 and moved from 6 to 9\na rolled 1 and moved from 9 to 10\na wins\nERROR game over",
+   "invalid jumps": "ERROR invalid snake\nERROR invalid ladder\nERROR invalid ladder\np rolled 5 and moved from 0 to 5 — ladder to 12",
+   "three players": "x rolled 4 and moved from 0 to 4 — ladder to 14\ny rolled 3 and moved from 0 to 3\nz rolled 2 and moved from 0 to 2\nx rolled 6 and moved from 14 to 20 — snake to 6\ny rolled 1 and moved from 3 to 4 — ladder to 14\nz rolled 2 and moved from 2 to 4 — ladder to 14\nx rolled 5 and moved from 6 to 11\ny rolled 6 and moved from 14 to 20 — snake to 6",
+   "six gives another roll": "a rolled 6 and moved from 0 to 6\na rolled 3 and moved from 6 to 9\nb rolled 2 and moved from 0 to 2\na rolled 6 and moved from 9 to 15\na rolled 6 and moved from 15 to 21\na rolled three sixes — turn cancelled\nb rolled 1 and moved from 2 to 3",
+   "six rule disabled by default": "a rolled 6 and moved from 0 to 6\nb rolled 3 and moved from 0 to 3\na rolled 6 and moved from 6 to 12"
+  }
+ },
+ "lru-cache": {
+  "sample": "1\nEVICT b\nMISS\n3",
+  "tests": {
+   "lru order with gets": "1\nEVICT b\nMISS\n3\nEVICT a\nMISS\n4",
+   "updates don't evict": "EVICT b\n9\nMISS",
+   "capacity one": "EVICT x\nMISS\n2\n3",
+   "lfu": "1\n1\n2\nEVICT c\n4\nEVICT b\n1",
+   "lfu ties use recency": "EVICT a\nMISS\n2"
+  }
+ }
+}
