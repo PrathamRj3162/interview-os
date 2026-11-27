@@ -18,6 +18,9 @@ E2E: `npm run test:e2e` runs Playwright against a local production build with th
 - `tests/design-phases.test.ts` — design phase plan and scaling, time pushes, early advance, never backwards, curveball determinism.
 - `tests/design-report.test.ts` — design evidence (quotes, element ids, element text), weighted coverage with dropped claims, red flags.
 - `tests/estimation.test.ts` — 1,000 seeds per template, determinism, number parsing, grading bands.
+- `tests/mc-analysis.test.ts` — ZIP round-trip, run-bundle contents, nonce-split outputs (fake markers ignored), file validation, extensibility diff, static facts (Java/Python), completeness/extensibility bands.
+- `tests/mc-bank.test.ts` — 15 problems with core + extension tests and stored outputs; in CI every Java reference is recompiled and must reproduce them.
+- `e2e/machine-coding.spec.ts` — multi-file Java on the real public Judge0, core-only submit before the reveal, server-clock reveal with snapshot, extension tests, frozen review (save refused), report with measured completeness/extensibility and no concurrency category.
 - `tests/live.test.ts` — live AI budget (provider order, per-attempt and total timeouts), `@@META` splitting, spoken-text filter.
 - `tests/eval-fallback.test.ts` — chunked evaluation when the one-shot report call fails; failed categories stay unscored.
 - `tests/learn.test.ts` — every design case has a valid diagram; quiz option order is a permutation; SM-2 intervals/ease, planner budget/determinism/dedupe/deadline, pattern tags exist in the bank, fundamentals bank integrity (4 topics × 25), GitHub URL parsing and dependency ranking.

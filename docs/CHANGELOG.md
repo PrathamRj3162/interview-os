@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.0 — 2026-11-28 · Machine coding round and LLD lab (Phase B)
+- **Machine coding round** (110 min = 90 build + 20 review, or 60): build a working multi-file command-line app in Java, Python, JavaScript or C++. Requirements panel, file tree with tabs, custom runs and a Submit against hidden tests (the sample plus core tests, and the extension tests once revealed). The interviewer acts as the product owner during the build and reviews your frozen code afterwards.
+- **Server clock:** at two-thirds of the build the server snapshots your saved files (a server-only column) and reveals one new requirement; at the end of the build the code is frozen for the review.
+- **Measured, not judged:** completeness = core tests passed on the final submit; extensibility = the extension's tests plus how many existing lines changed since the snapshot (thresholds published in the report); static code facts (types, longest method, repeated blocks, public methods that never check their inputs, unsynchronised shared state when concurrency matters). Concurrency is only scored for problems that need it.
+- **15 original problems** with multi-file Java references; expected outputs come from the references and CI re-runs them against a local JDK. Runs use Judge0's free multi-file mode with JDK 17, Python 3.12, Node 22 and GCC 14 (one submission per run of all tests).
+- **LLD lab:** SOLID with before/after Java, class-diagram basics, ten patterns with when an interviewer expects them, and a Java concurrency primer. **LLD cases 4 → 25**, twelve of them sharing their statement with a machine coding problem ("Build it").
+- New content ships as draft behind `/review`. Migration 0014.
+
 ## 0.11.0 — 2026-11-28 · System design v2 (Phase A of the hiring-standard plan)
 **Content gate (every phase from now on)**
 - One content schema (id, version, type, difficulty, tags, status draft|reviewed|live). Only live items reach users; admins (`ADMIN_EMAILS`, confirmed email) see everything else marked Preview. `/review` shows each item's automated checks (the same ones CI runs), open reports and status controls; failing checks can't go live; an edit bumps the version and needs review again (migrations 0010, 0012).

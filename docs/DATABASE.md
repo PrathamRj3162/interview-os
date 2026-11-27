@@ -56,3 +56,8 @@ Static content (problems, lessons, quizzes) is referenced by `slug` and lives in
 ## 0013 — System design round
 - `mock_interviews.design_case` (lab case slug, insertable by the user; the server ignores cases the user can't see or of the wrong kind).
 - `mock_interviews.phase` also accepts the design phases: requirements, estimates, api, high_level, deep_dive, curveball (wrap is shared).
+
+## 0014 — Machine coding
+- `mock_interviews.kind` accepts `machine_coding`; `mc_problem` (bank slug, insertable at setup); phases `build`, `review`.
+- `mock_interviews.mc_snapshot` (< 200 KB): the files saved at the reveal, written only by the server (users can't update it), used for the extensibility diff.
+- Hidden-test submits go to `submissions` (server-only writes) with `problem_slug = 'mc:<slug>'`, so they never count as DSA solves or DSA coding accuracy.

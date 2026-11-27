@@ -18,7 +18,7 @@
 
 ## In progress — hiring-standard upgrade (approved 2026-11-25)
 - [x] Phase A: system design v2 — content gate, whiteboard, design phases, rubric v2 + coverage + red flags, 24 cases, 25 primers, estimation trainer, design fundamentals drill (v0.11.0). New content is draft until approved on /review.
-- [ ] Phase B: machine coding round · [ ] C: CS fundamentals v2 · [ ] D: OA + aptitude · [ ] E: behavioural + loops · [ ] F: DSA extras · [ ] G: AI-assisted coding round
+- [x] Phase B: machine coding round + LLD lab (v0.12.0) · [ ] C: CS fundamentals v2 · [ ] D: OA + aptitude · [ ] E: behavioural + loops · [ ] F: DSA extras · [ ] G: AI-assisted coding round
 - [ ] After A–G: report debrief upgrade — scorecard format (signal/concern/next-level bar, confidence, level estimate, advance yes/no, what wasn't measured), facts from code incl. complexity check, model answers only from verified content, validated drill links, anti-fluff linter + citation filter, two-pass auditor, 40-interview calibration set + `npm run eval:reports` (targets ≥70% exact, ≥95% within one, ≤10% over-scoring), per-round realism, honest trends + outcome logging. Plan and calibration-set outline go to the owner for approval first.
 
 ## Open

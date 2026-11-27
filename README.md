@@ -40,6 +40,8 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | **Study planner**: a week planned from your measured gaps within your daily time, with the reason for each task; add/complete/delete tasks | ✅ |
 | **System design lab v2**: 24 cases (20 HLD + 4 LLD) with SDE-1/SDE-2 variants, must-cover checklists, curveballs, common mistakes and reference diagrams (unlocked after you attempt the case); 25 building-block primers; an estimation trainer; a 15-minute design fundamentals drill | ✅ |
 | **System design round v2**: an Excalidraw whiteboard the interviewer reads, time-boxed phases with a scheduled curveball, level-calibrated rubric (SDE-1 / SDE-2+), checklist coverage from verified evidence and rule-based red flags in the report | ✅ |
+| **Machine coding round**: 90-minute multi-file build (Java/Python/JS/C++) with hidden tests, a new requirement revealed by the server at minute 60, a frozen-code review, and completeness/extensibility measured from tests and the diff; 15 original problems | ✅ |
+| **LLD lab**: SOLID before/after, 10 patterns, Java concurrency, 25 LLD cases (12 also buildable as machine coding) | ✅ |
 | **Content review gate**: new content ships as draft and goes live only after approval on `/review`; users can report problems | ✅ |
 | **Project deep-dive**: add projects, analyse a public GitHub repo (metadata, README, manifests) into likely questions; practise a focused deep dive | ✅ |
 
