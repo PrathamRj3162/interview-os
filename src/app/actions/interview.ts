@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { CASE_BY_SLUG } from "@/lib/learn/design";
 import { requireUser, getCurrentUser } from "@/lib/supabase/server";
 import { PERSONAS, KINDS, DIFFICULTIES, DURATIONS } from "@/lib/interview/config";
 import { LANGUAGES, COMPANIES } from "@/lib/validation/profile";
@@ -25,6 +26,8 @@ const schema = z.object({
   problem_slug: z.string().refine((s) => s in PROBLEM_BY_SLUG, "Unknown problem").nullable(),
   /** Focus for this interview, e.g. a system design lab topic. */
   topic: z.string().trim().max(200).nullable(),
+  /** System design lab case this round is about (links the round to its checklist and curveballs). */
+  design_case: z.string().refine((s) => s in CASE_BY_SLUG, "Unknown case").nullable(),
   project_id: z.uuid().nullable(),
 });
 
@@ -36,7 +39,7 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
     duration_min: fd.get("duration_min"), mode: fd.get("mode"), input_mode: fd.get("input_mode"),
     language: blank(fd.get("language")), company: blank(fd.get("company")), resume_id: blank(fd.get("resume_id")),
     problem_slug: blank(fd.get("problem_slug")),
-    topic: blank(fd.get("topic")), project_id: blank(fd.get("project_id")),
+    topic: blank(fd.get("topic")), project_id: blank(fd.get("project_id")), design_case: blank(fd.get("design_case")),
   });
   if (!parsed.success) return { fieldErrors: fieldErrorsFrom(parsed.error.issues), message: "Please check the highlighted options." };
 
@@ -52,6 +55,9 @@ export async function createInterview(_: ActionState, fd: FormData): Promise<Act
   }
   const { problem_slug: chosen, ...fields } = parsed.data;
   const row: Record<string, unknown> = { ...fields, user_id: user.id };
+  // A case only applies to design rounds of the same kind; the HLD round starts in its first phase.
+  if (fields.design_case && CASE_BY_SLUG[fields.design_case].kind !== fields.kind) row.design_case = null;
+  if (fields.kind === "hld") row.phase = "requirements";
 
   // The DSA round gets one problem from the bank: the chosen one, or a random fresh one at this difficulty.
   if (parsed.data.kind === "dsa") {

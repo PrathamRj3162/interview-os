@@ -15,6 +15,7 @@ import { useDsaWorkspace, type DsaInit, type DsaWorkspace } from "@/components/d
 import { ProblemPanel, EditorPanel, PhaseStepper, SplitPanes } from "@/components/dsa/panels";
 import type { Phase } from "@/lib/dsa/phases";
 import { boardText, type BoardElement } from "@/lib/interview/board";
+import { DESIGN_PHASES, DESIGN_PHASE_LABELS, type DesignPhase } from "@/lib/interview/design-phases";
 import { Whiteboard } from "./whiteboard";
 
 type Turn = { id: number; role: "interviewer" | "candidate"; content: string; code?: string | null };
@@ -36,6 +37,8 @@ export type RoomProps = {
   sttServer?: boolean;
   /** System design rounds: an Excalidraw whiteboard the interviewer can read. */
   board?: { initialElements: Record<string, unknown>[] };
+  /** System design (HLD) round: the server-driven phase, shown as a stepper. */
+  designPhase?: string | null;
 };
 
 type Net = "idle" | "thinking" | "error";
@@ -61,6 +64,8 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   const onBoardElements = useCallback((els: readonly BoardElement[]) => { boardEls.current = els; }, []);
   const boardPayload = () => (p.board ? { board: boardText(boardEls.current) || null } : {});
   const [pane, setPane] = useState<"board" | "code">("board");
+  const [designPhase, setDesignPhase] = useState<string | null>(p.designPhase ?? null);
+  const isDesign = p.designPhase !== undefined;
   const [net, setNet] = useState<Net>("idle");
   /** The interviewer's reply while it streams in (null when nothing is streaming). */
   const [liveText, setLiveText] = useState<string | null>(null);
@@ -148,7 +153,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
           if (speakingStarted && newest) { spokenRef.current = newest.id; tts.endSpeech(); }
           setLiveText(null);
           setTurns(data.turns);
-          if (data.phase) wsRef.current?.setPhase(data.phase as Phase);
+          if (data.phase) { if (wsRef.current) wsRef.current.setPhase(data.phase as Phase); else if (isDesign) setDesignPhase(data.phase); }
           if (data.shouldEnd) setWrapUp(true);
           setNet("idle");
           return true;
@@ -164,7 +169,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
     setLiveText(null);
     setNet("error"); setError("The connection dropped while the interviewer was replying. Your answer is saved — press Retry."); setRetryable(true);
     return false;
-  }, [noteAi, tts, mic, p.inputMode, voice.settings.bargeIn]);
+  }, [noteAi, tts, mic, p.inputMode, voice.settings.bargeIn, isDesign]);
 
   const post = useCallback(async (body: object) => {
     setNet("thinking"); setError(null); setRetryable(false);
@@ -175,7 +180,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
       const data = await res.json().catch(() => ({}));
       if (res.ok) noteAi(Date.now() - t0);
       if (data.turns) setTurns(data.turns);
-      if (data.phase) wsRef.current?.setPhase(data.phase as Phase);
+      if (data.phase) { if (wsRef.current) wsRef.current.setPhase(data.phase as Phase); else if (isDesign) setDesignPhase(data.phase); }
       if (typeof data.hintsUsed === "number") wsRef.current?.setHintsUsed(data.hintsUsed);
       if (!res.ok) {
         setNet("error"); setError(data.error ?? "Something went wrong."); setRetryable(Boolean(data.retryable ?? res.status >= 500));
@@ -556,6 +561,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
   return (
     <div className="flex h-[calc(100dvh-8rem)] min-h-[32rem] flex-col gap-3 lg:h-[calc(100dvh-4rem)]">
       {headerEl}
+      {isDesign && <DesignStepper phase={designPhase} />}
       <div className={cn("grid min-h-0 flex-1 gap-3", p.board ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]" : showCode && "lg:grid-cols-2")}>
         {transcriptEl}
         {p.board && (
@@ -568,7 +574,7 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
               </div>
             )}
             <div className={cn("min-h-0 flex-1", pane !== "board" && showCode && "hidden")}>
-              <Whiteboard interviewId={p.id} initialElements={p.board.initialElements} onElements={onBoardElements} />
+              <Whiteboard interviewId={p.id} initialElements={p.board.initialElements} onElements={onBoardElements} footer={pane === "board" || !showCode ? composerEl : undefined} />
             </div>
           </div>
         )}
@@ -590,9 +596,24 @@ function RoomCore({ ws, ...p }: RoomProps & { ws?: DsaWorkspace }) {
         )}
       </div>
       {errorsEl}
-      {composerEl}
+      {!(p.board && (pane === "board" || !showCode)) && composerEl}
       {keysDialog}
       {voiceDialog}
     </div>
+  );
+}
+
+/** Phase stepper for the system design round (the server moves it on a timer). */
+function DesignStepper({ phase }: { phase: string | null }) {
+  const at = phase ? DESIGN_PHASES.indexOf(phase as DesignPhase) : 0;
+  return (
+    <ol className="flex items-center gap-1 overflow-x-auto text-[11px]" aria-label="Interview phase" data-testid="design-phases">
+      {DESIGN_PHASES.map((ph, i) => (
+        <li key={ph} aria-current={i === at ? "step" : undefined}
+          className={cn("whitespace-nowrap rounded-full px-2 py-0.5", i === at ? "bg-accent text-accent-fg font-semibold" : i < at ? "text-success" : "text-muted")}>
+          {i < at && "✓ "}{DESIGN_PHASE_LABELS[ph]}
+        </li>
+      ))}
+    </ol>
   );
 }

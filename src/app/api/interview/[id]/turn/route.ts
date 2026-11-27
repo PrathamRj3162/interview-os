@@ -3,10 +3,12 @@ import { z } from "zod";
 import { getCurrentUser, createAdminClient } from "@/lib/supabase/server";
 import { AIUnavailableError } from "@/lib/ai";
 import { assertQuota, recordUsage, QuotaExceededError } from "@/lib/ai/quota";
-import { streamInterviewerTurn, practiceHint, type DsaPrompt } from "@/lib/interview/engine";
+import { streamInterviewerTurn, practiceHint, type DsaPrompt, type DesignPrompt } from "@/lib/interview/engine";
 import { loadInterview, loadTurns, loadCandidateContext, minutesLeft } from "@/lib/interview/server";
 import { PERSONAS, CHARACTERS, type PersonaId } from "@/lib/interview/config";
 import { PHASES, PHASE_GOALS, PHASE_LABELS, nextPhase, codeLinesBeyondStarter, lineDiff, type Phase } from "@/lib/dsa/phases";
+import { DESIGN_PHASES, DESIGN_PHASE_GOALS, DESIGN_PHASE_LABELS, asDesignPhase, nextDesignPhase, pickCurveball, type DesignPhase } from "@/lib/interview/design-phases";
+import { CASE_BY_SLUG } from "@/lib/learn/design";
 import { dsaContextFor, loadEvents, logEvent, saveWorkspace, describeEvents, asPhase, isLang, initialWorkspace, type Workspace } from "@/lib/dsa/server";
 import { starterCode } from "@/lib/dsa/harness";
 import { LANG_LABELS, type Lang } from "@/lib/dsa/types";
@@ -181,6 +183,37 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       elapsedShare: 1 - left / iv.duration_min,
     };
   }
+  // System design phase machine: time-boxed phases driven by the server, plus an AI-requested early advance.
+  let dPhase: DesignPhase | null = iv.kind === "hld" ? asDesignPhase(iv.phase) : null;
+  let design: DesignPrompt | undefined;
+  const dcase = iv.design_case ? CASE_BY_SLUG[iv.design_case] : undefined;
+  const curveball = dPhase ? pickCurveball(id, dcase?.curveballs?.length ? dcase.curveballs : undefined) : undefined;
+  const designStep = (aiAdvance: boolean) => nextDesignPhase({
+    current: dPhase!, aiAdvance, durationMin: iv.duration_min,
+    elapsedMin: (Date.now() - Date.parse(iv.started_at)) / 60_000,
+    candidateTurns: turns.filter((x) => x.role === "candidate").length,
+  });
+  /** Persists the phase (also the first time, when the column is still null) and logs real transitions. */
+  const moveDesign = (to: DesignPhase, reason: string | null) => {
+    if (to === iv.phase) return;
+    phaseWrites.push(supabase.from("mock_interviews").update({ phase: to }).eq("id", id));
+    if (to !== dPhase) phaseWrites.push(logEvent(supabase, id, user.id, "phase", { from: dPhase, to, reason, ...(to === "curveball" ? { curveball } : {}) }));
+    iv.phase = to; dPhase = to;
+  };
+  if (dPhase) {
+    const pre = designStep(false);
+    moveDesign(pre.phase, pre.reason);
+    const lastBoard = [...turns].reverse().find((t) => t.role === "candidate" && t.board)?.board;
+    design = {
+      caseTitle: dcase?.title, casePrompt: dcase?.prompt,
+      pmFacts: dcase ? [...(dcase.estimates ?? []), ...dcase.nonFunctional] : [],
+      phase: `${dPhase} (${DESIGN_PHASE_LABELS[dPhase]})`, phaseGoal: DESIGN_PHASE_GOALS[dPhase],
+      phases: DESIGN_PHASES.map((p) => (p === dPhase ? `[${DESIGN_PHASE_LABELS[p]}]` : DESIGN_PHASE_LABELS[p])).join(" → "),
+      phaseMinutesLeft: pre.phaseMinutesLeft, overrun: pre.overrun,
+      curveball: dPhase === "curveball" ? curveball : undefined,
+      boardEmpty: !lastBoard,
+    };
+  }
   const nudge = body.action === "nudge" ? NUDGE_TEXT[body.reason](body.detail) : undefined;
 
   const enc = new TextEncoder();
@@ -189,8 +222,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const send = (event: string, data: unknown) => controller.enqueue(enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
       let firstAt = 0;
       try {
-        const r = await streamInterviewerTurn(iv, ctx!, turns, left, prompt, (text) => { if (!firstAt) firstAt = Date.now(); send("delta", { text }); }, nudge);
+        const r = await streamInterviewerTurn(iv, ctx!, turns, left, prompt, (text) => { if (!firstAt) firstAt = Date.now(); send("delta", { text }); }, nudge, design);
         if (dsa && ws && r.data.advance_phase) { const post = signals(true); movePhase(post.phase, post.reason); }
+        if (design && r.data.advance_phase) { const post = designStep(true); moveDesign(post.phase, post.reason); }
         const [ins] = await Promise.all([
           writeTurn("interviewer", r.data.say),
           recordUsage(supabase, user.id, body.action === "nudge" ? "interview_nudge" : "interview_turn", r.provider, r.model),
@@ -199,7 +233,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (ins.error) { send("error", { error: "Could not save the interviewer's reply.", turns, retryable: true }); return; }
         const timing = { prepMs, firstTokenMs: firstAt ? firstAt - t0 : null, totalMs: Date.now() - t0 };
         console.info(`[turn] ${JSON.stringify(timing)}`);
-        send("done", { turns: [...turns, ins.data], shouldEnd: r.data.should_end, phase: dsa ? phase : undefined, minutesLeft: left, timing });
+        send("done", { turns: [...turns, ins.data], shouldEnd: r.data.should_end, phase: dsa ? phase : dPhase ?? undefined, minutesLeft: left, timing });
       } catch (e) {
         const msg = e instanceof QuotaExceededError || e instanceof AIUnavailableError
           ? e.message

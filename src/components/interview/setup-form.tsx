@@ -20,7 +20,7 @@ const on = "border-accent bg-accent-soft";
 const off = "border-border bg-surface hover:border-border-strong hover:bg-surface-2";
 
 export function SetupForm({ defaults, resumes, suggestions }: {
-  defaults: { kind: KindId; mode?: "mock" | "practice"; topic?: string | null; projectId?: string | null; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
+  defaults: { kind: KindId; mode?: "mock" | "practice"; topic?: string | null; designCase?: string | null; projectId?: string | null; problem?: string | null; persona?: PersonaId | null; language: string | null; company: string | null; resumeId: string | null; difficulty?: Difficulty };
   resumes: { id: string; file_name: string; analysed: boolean }[];
   /** Suggested difficulty per round, from recent verdicts. */
   suggestions?: Partial<Record<KindId, { difficulty: Difficulty; reason: string }>>;
@@ -48,6 +48,7 @@ export function SetupForm({ defaults, resumes, suggestions }: {
   return (
     <form action={action} className="space-y-6">
       {defaults.topic && <input type="hidden" name="topic" value={defaults.topic} />}
+      {defaults.designCase && <input type="hidden" name="design_case" value={defaults.designCase} />}
       {defaults.projectId && <input type="hidden" name="project_id" value={defaults.projectId} />}
       {defaults.topic && <p className="rounded-lg border border-accent/40 bg-accent-soft px-3 py-2 text-sm">Focus: <span className="font-medium">{defaults.topic}</span></p>}
       {/* Stepper */}

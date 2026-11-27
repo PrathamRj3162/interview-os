@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import "@excalidraw/excalidraw/index.css";
 import { boardGraph, type BoardElement } from "@/lib/interview/board";
 
@@ -22,13 +22,15 @@ type Props = {
   initialElements: readonly Record<string, unknown>[];
   /** Latest elements, read by the room when an answer is sent. */
   onElements: (els: readonly BoardElement[]) => void;
+  /** Docked under the canvas — the room puts the answer box here so you can type without leaving the board. */
+  footer?: ReactNode;
 };
 
 /**
  * Excalidraw whiteboard for system design rounds. The drawing is sent to the interviewer as compact text with
  * each answer (lib/interview/board.ts), and autosaved for reloads.
  */
-export function Whiteboard({ interviewId, initialElements, onElements }: Props) {
+export function Whiteboard({ interviewId, initialElements, onElements, footer }: Props) {
   const [saveState, setSaveState] = useState<"saved" | "saving" | "error" | null>(null);
   const [summary, setSummary] = useState(() => boardGraph(initialElements as unknown as BoardElement[]));
   const last = useRef<string>(sig(initialElements));
@@ -89,6 +91,7 @@ export function Whiteboard({ interviewId, initialElements, onElements }: Props) 
         </div>
       </div>
       <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted">Put text inside boxes to name components; connect them with arrows (label an arrow by double-clicking it). The interviewer reads boxes, arrows and labels, not colours or positions.</p>
+      {footer && <div className="border-t border-border p-2" data-testid="board-composer">{footer}</div>}
     </section>
   );
 }

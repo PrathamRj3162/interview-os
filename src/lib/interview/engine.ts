@@ -14,7 +14,34 @@ export type InterviewRow = {
   id: string; kind: KindId; difficulty: Difficulty; persona: PersonaId; mode: "mock" | "practice";
   company: string | null; language: string | null; duration_min: number; started_at: string;
   topic?: string | null;
+  design_case?: string | null;
 };
+
+/** System design round: the case, the server-driven phase and what the interviewer may reveal. */
+export type DesignPrompt = {
+  caseTitle?: string; casePrompt?: string;
+  /** Numbers the interviewer (as PM) may give — only when asked. */
+  pmFacts: string[];
+  phase: string; phaseGoal: string; phases: string; phaseMinutesLeft: number;
+  /** The candidate ran over the previous phase's time: steer them on. */
+  overrun: boolean;
+  curveball?: string;
+  boardEmpty: boolean;
+};
+
+function designSection(d: DesignPrompt) {
+  return [
+    "",
+    "SYSTEM DESIGN ROUND — the candidate has a whiteboard; what they drew arrives with each answer as text (boxes and labelled arrows, with [n:…]/[e:…] ids). Refer to components by their names on the board.",
+    d.caseTitle ? `The system to design: ${d.caseTitle}. ${d.casePrompt ?? ""}` : "",
+    d.pmFacts.length ? `Product facts you may give AS THE PM, only if the candidate asks (never volunteer them): ${d.pmFacts.join("; ")}` : "",
+    `Phase flow: ${d.phases}. CURRENT PHASE: ${d.phase} — about ${Math.max(1, Math.round(d.phaseMinutesLeft))} min left in it. Goal now: ${d.phaseGoal}`,
+    d.overrun ? "- Time check: the previous phase ran over its time box. In one short sentence, move the candidate on to the current phase's goal." : "",
+    d.curveball ? `- CURVEBALL for this phase (introduce it now if you haven't yet, in your own words): ${d.curveball}` : "",
+    d.phase.startsWith("high_level") && d.boardEmpty ? "- The whiteboard is still empty: ask them to sketch the main components and arrows on it." : "",
+    "Set advance_phase=true only when the current phase's goal is clearly met and your message moves to the next phase.",
+  ].filter(Boolean).join("\n");
+}
 
 export type CandidateContext = {
   name: string | null; role: string | null; experience: string | null;
@@ -59,7 +86,7 @@ function dsaSection(iv: InterviewRow, d: DsaPrompt) {
   ].filter(Boolean).join("\n");
 }
 
-function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean, dsa?: DsaPrompt) {
+function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: number, isFirst: boolean, dsa?: DsaPrompt, design?: DesignPrompt) {
   const persona = PERSONAS[iv.persona] ?? PERSONAS.professional;
   const lines = [
     `You are ${CHARACTERS[iv.persona]?.first ?? "the interviewer"}, a "${persona.name}" (interviewer tier: ${TIERS[CHARACTERS[iv.persona]?.tier ?? "standard"].label}), conducting a ${KINDS[iv.kind].name} for a ${ctx.role ?? "software engineer"} candidate (${ctx.experience ?? "unknown experience"}).`,
@@ -89,9 +116,10 @@ function systemPrompt(iv: InterviewRow, ctx: CandidateContext, minutesLeft: numb
       : "",
     "",
     // Streamed reply: the spoken text first (so speech can start), then one metadata line.
-    `OUTPUT FORMAT (strict): first write exactly what you say to the candidate as plain spoken text — no JSON, no markdown, no labels. Then, on a final separate line, write ${META} followed by JSON: {"topic": short label of what this probes, "is_follow_up": boolean, ${dsa ? '"advance_phase": boolean, ' : ""}"should_end": boolean}.`,
+    `OUTPUT FORMAT (strict): first write exactly what you say to the candidate as plain spoken text — no JSON, no markdown, no labels. Then, on a final separate line, write ${META} followed by JSON: {"topic": short label of what this probes, "is_follow_up": boolean, ${dsa || design ? '"advance_phase": boolean, ' : ""}"should_end": boolean}.`,
   ];
   if (dsa) lines.push(dsaSection(iv, dsa));
+  if (design) lines.push(designSection(design));
 
   const facts: string[] = [];
   if (ctx.claims.length && ["resume_screen", "project", "full", "company", "behavioral"].includes(iv.kind)) {
@@ -135,10 +163,10 @@ function workspaceMessage(d: DsaPrompt): ChatMessage {
  * An optional `nudge` describes something the candidate did (silence, a failed run, a paste) that the
  * interviewer should react to without waiting for the candidate to speak.
  */
-export async function streamInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa: DsaPrompt | undefined, onSay: (text: string) => void, nudge?: string) {
+export async function streamInterviewerTurn(iv: InterviewRow, ctx: CandidateContext, turns: Turn[], minutesLeft: number, dsa: DsaPrompt | undefined, onSay: (text: string) => void, nudge?: string, design?: DesignPrompt) {
   const isFirst = turns.length === 0;
   const messages: ChatMessage[] = [
-    { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst, dsa) },
+    { role: "system", content: systemPrompt(iv, ctx, minutesLeft, isFirst, dsa, design) },
     ...historyMessages(turns, !dsa),
   ];
   if (dsa) messages.push(workspaceMessage(dsa));

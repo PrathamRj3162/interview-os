@@ -81,3 +81,22 @@ test("HLD room: whiteboard is sent with the answer as text and autosaved", async
   expect(csp, csp.join("\n")).toEqual([]);
   for (const h of fontHosts) expect(h).toBe("localhost:3000"); // fonts come from our own origin, not a CDN
 });
+
+test("HLD phases: the server moves the round on by time, logs it, and the room shows it", async ({ page }) => {
+  // A round that started 26 minutes ago is past requirements/estimates/API/high-level: deep dive is due.
+  const started = new Date(Date.now() - 26 * 60_000).toISOString();
+  const { data: iv } = await admin().from("mock_interviews").insert({ user_id: userId, kind: "hld", difficulty: "medium", persona: "architect", mode: "practice", input_mode: "text", duration_min: 45, design_case: "url-shortener", phase: "requirements", started_at: started }).select("id").single();
+  await login(page);
+  await page.goto(`/interview/${iv!.id}`);
+  await expect(page.getByTestId("design-phases").locator("[aria-current=step]")).toHaveText("Requirements");
+  // The answer box sits inside the whiteboard panel, so you can type without leaving the board.
+  await expect(page.getByTestId("board-composer").getByLabel("Your answer")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByLabel("Your answer")).toBeEnabled({ timeout: 30_000 });
+  await page.getByLabel("Your answer").fill("Users shorten links and follow redirects; reads dominate.");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(page.getByTestId("design-phases").locator("[aria-current=step]")).toHaveText("Deep dive", { timeout: 30_000 });
+  const { data: row } = await admin().from("mock_interviews").select("phase").eq("id", iv!.id).single();
+  expect(row!.phase).toBe("deep_dive");
+  const { data: ev } = await admin().from("interview_events").select("payload").eq("interview_id", iv!.id).eq("type", "phase");
+  expect(ev!.some((e) => (e.payload as { to: string; reason: string }).to === "deep_dive" && (e.payload as { reason: string }).reason === "time")).toBe(true);
+});

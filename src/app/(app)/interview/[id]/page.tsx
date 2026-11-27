@@ -38,6 +38,7 @@ export default async function InterviewRoomPage({ params }: { params: Promise<{ 
       startedAt={iv.started_at}
       initialTurns={turns.map((t) => ({ id: t.id, role: t.role, content: t.content, code: t.code, board: t.board }))}
       dsa={dsaInit}
+      designPhase={iv.kind === "hld" ? iv.phase ?? "requirements" : undefined}
       board={["hld", "lld"].includes(iv.kind) ? { initialElements: ((iv.workspace as { board?: { elements?: Record<string, unknown>[] } } | null)?.board?.elements) ?? [] } : undefined}
     />
   );

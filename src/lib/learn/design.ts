@@ -22,6 +22,8 @@ export type DesignCase = {
   deepDives: string[];
   tradeoffs: string[];
   followUps: string[];
+  /** Scheduled curveballs for the live round (one is picked per interview). */
+  curveballs?: string[];
 };
 
 export const HLD_FRAMEWORK = [

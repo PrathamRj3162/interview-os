@@ -36,7 +36,7 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
   const meta = designMeta(c);
   if (!gate.visible(meta)) notFound();
   const { data: p } = await supabase.from("user_progress").select("status").eq("user_id", user.id).eq("item_type", c.kind).eq("item_slug", slug).maybeSingle();
-  const practice = `/interview/new?kind=${c.kind}&persona=architect&topic=${encodeURIComponent(`Design: ${c.title} — ${c.prompt}`)}`;
+  const practice = `/interview/new?kind=${c.kind}&persona=architect&case=${slug}&topic=${encodeURIComponent(`Design: ${c.title} — ${c.prompt}`)}`;
   return (
     <article className="space-y-5">
       <div>
