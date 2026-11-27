@@ -17,6 +17,9 @@ Mutations are Next.js Server Actions (POST, same-origin, CSRF-protected by Next'
 | addProject / analyseProject / deleteProject | app/actions/projects.ts | title, repo_url… | Public GitHub only; analysis written with the service role |
 | reportProblem | app/actions/content.ts | itemId, version, reason, note? | Any user; one open report per item version |
 | setContentStatus / resolveReports | app/actions/content.ts | itemId, version, status | Admin only (`ADMIN_EMAILS`); failing checks can't go live |
+| markAttempted | app/actions/learn.ts | kind, slug | Unlocks a design case's reference (self-reported) |
+| gradePrimer | app/actions/learn.ts | slug, answers[] | Server-graded primer checks; all correct = studied |
+| gradeDesignDrill | app/actions/design-drill.ts | items[{slug, answer}] | Key points credited only with quotes verified in code; misses → flashcards; one AI request |
 | deleteAccount | app/actions/profile.ts | confirm="DELETE" | Service role; deletes user (cascade) then storage |
 
 Routes: `GET /api/health` → `{ ok, database, ai: [providerIds], region }`; `?db=1` adds `roundTripsMs` from three `ping()` calls. `POST /api/csp-report` collects CSP violation reports (logged, no body stored). `GET /auth/callback` → email confirm / recovery.
@@ -25,9 +28,10 @@ Routes: `GET /api/health` → `{ ok, database, ai: [providerIds], region }`; `?d
 
 | Route | Body | Notes |
 |---|---|---|
-| `POST /api/interview/:id/turn` | `{action:"start"}` · `{action:"answer", content, code?, language?, pasted?}` · `{action:"hint"}` · `{action:"nudge", reason:"idle"\|"failed_run"\|"paste"}` | One interviewer turn, streamed as SSE: `delta` (text), then `done` (`{turn, phase, timing}`) or `error`. Live AI budget 8 s/attempt, 15 s total. DSA: deterministic opening and graded hints (no AI). `nudge` (DSA only) is limited to one per 2 minutes and counts toward the AI limit; mock mode asks a question, never a hint. Turns are written with the service role. |
+| `POST /api/interview/:id/turn` | `{action:"start"}` · `{action:"answer", content, code?, board?, language?, pasted?}` · `{action:"hint"}` · `{action:"nudge", reason:"idle"\|"failed_run"\|"paste"}` | One interviewer turn, streamed as SSE: `delta` (text), then `done` (`{turn, phase, timing}`) or `error`. Live AI budget 8 s/attempt, 15 s total. DSA: deterministic opening and graded hints (no AI). `nudge` (DSA only) is limited to one per 2 minutes and counts toward the AI limit; mock mode asks a question, never a hint. Turns are written with the service role. |
 | `POST /api/interview/:id/run` | `{language, code, mode:"run"\|"submit"}` | Judge0 execution. `run` = examples, `submit` = examples + hidden tests (saved to `submissions`). Judge limit + cooldown → 429. |
 | `POST /api/interview/:id/events` | `{events:[{type,payload}], workspace?:{language, code}}` | Room telemetry (browser run summary, paste, idle, language, reset) + server autosave. zod per event type. |
+| `POST /api/interview/:id/board` | `{elements}` | Whiteboard autosave for HLD/LLD rounds (≤180 KB, in `workspace.board`); redraw state only — what the interviewer saw is stored per turn. |
 | `POST /api/interview/:id/summary` | — | 3-sentence spoken feedback right after ending (live AI budget). |
 | `POST /api/interview/:id/complete` | — | Idempotent report generation (status lock, service role). With `Accept: text/event-stream` it streams `stage` events then `done`. Falls back to a chunked evaluation if the one-shot call fails. DSA facts, metrics, verdict and paste flags are computed in code. |
 | `POST /api/voice/stt` | multipart `audio` (≤4 MB) | Whisper via Groq, only when `GROQ_API_KEY` is set (503 otherwise); counts toward the daily AI limit. |

@@ -38,7 +38,9 @@ A free, resume-aware SDE interview-prep platform. Upload your resume, see which 
 | **CS fundamentals**: 100 original questions (OS, DBMS, networks, OOP) graded on the server with options in random order, explanations, accuracy per topic; misses become flashcards | ✅ |
 | **Revision**: SM-2 spaced-repetition flashcards from quiz misses, interview reports or your own | ✅ |
 | **Study planner**: a week planned from your measured gaps within your daily time, with the reason for each task; add/complete/delete tasks | ✅ |
-| **System design lab**: 8 HLD + 4 LLD case studies with reveal-as-you-go reference designs and a reference diagram for each, an on-device sketchpad; practise the same case with the architect interviewer | ✅ |
+| **System design lab v2**: 24 cases (20 HLD + 4 LLD) with SDE-1/SDE-2 variants, must-cover checklists, curveballs, common mistakes and reference diagrams (unlocked after you attempt the case); 25 building-block primers; an estimation trainer; a 15-minute design fundamentals drill | ✅ |
+| **System design round v2**: an Excalidraw whiteboard the interviewer reads, time-boxed phases with a scheduled curveball, level-calibrated rubric (SDE-1 / SDE-2+), checklist coverage from verified evidence and rule-based red flags in the report | ✅ |
+| **Content review gate**: new content ships as draft and goes live only after approval on `/review`; users can report problems | ✅ |
 | **Project deep-dive**: add projects, analyse a public GitHub repo (metadata, README, manifests) into likely questions; practise a focused deep dive | ✅ |
 
 ## Tech stack

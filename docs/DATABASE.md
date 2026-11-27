@@ -45,3 +45,14 @@ Static content (problems, lessons, quizzes) is referenced by `slug` and lives in
 - `content_reviews (item_id, version, status draft|reviewed|live, reviewed_by)` — overrides the status shipped in code for one version of a content item. Readable by signed-in users; written only by the server after an `ADMIN_EMAILS` check. Editing an item bumps its version, so it needs review again.
 - `content_reports` — "Report a problem" (reason + optional note), one open report per user per item version; users insert/read only their own rows.
 - `content_hidden_items()` — `security definer`; item versions with open reports from 3+ different users (hidden until an admin resolves them). Exposes no reporter identities.
+
+## 0011 — Whiteboard per turn
+- `interview_turns.board` (≤ 9,000 chars): the whiteboard as compact text sent with that answer. Written only by the server with the turn; diagram evidence in reports is checked against it.
+
+## 0012 — Review gate hardening
+- Users may read only `item_id, version, status, updated_at` of `content_reviews`.
+- `content_hidden_items()` counts only reports from confirmed accounts at least 7 days old.
+
+## 0013 — System design round
+- `mock_interviews.design_case` (lab case slug, insertable by the user; the server ignores cases the user can't see or of the wrong kind).
+- `mock_interviews.phase` also accepts the design phases: requirements, estimates, api, high_level, deep_dive, curveball (wrap is shared).

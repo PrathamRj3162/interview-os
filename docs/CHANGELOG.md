@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.11.0 — 2026-11-28 · System design v2 (Phase A of the hiring-standard plan)
+**Content gate (every phase from now on)**
+- One content schema (id, version, type, difficulty, tags, status draft|reviewed|live). Only live items reach users; admins (`ADMIN_EMAILS`, confirmed email) see everything else marked Preview. `/review` shows each item's automated checks (the same ones CI runs), open reports and status controls; failing checks can't go live; an edit bumps the version and needs review again (migrations 0010, 0012).
+- "Report a problem" on content. Reports from three confirmed accounts at least 7 days old hide an item until an admin resolves them, so throwaway accounts can't take content down.
+
+**The round**
+- Excalidraw whiteboard in HLD and LLD rooms, read by the interviewer: each answer carries the board as compact text (boxes → nodes, labelled arrows → edges, stable `[n:…]`/`[e:…]` ids), stored server-side with the turn (migration 0011). Autosaved for reloads. Fonts are self-hosted so the CSP stays strict. The answer box sits inside the whiteboard panel.
+- Time-boxed phases driven by the server: requirements 5 → estimates 5 → API & data 5 → high-level 10 → deep dive 15 → curveball 5 → wrap-up (scaled to the round length). The interviewer acts as PM (numbers only when asked), is told to steer on after an overrun, and introduces one scheduled curveball per round (migration 0013: `design_case`, design phases).
+- HLD rubric v2: requirements, estimation, API & data model, architecture (core), deep dive (core), scaling & reliability, trade-offs, operations, communication — each with SDE-1 and SDE-2+ anchor sets chosen by difficulty.
+- Report: checklist coverage score (an item counts only with a verified quote or a whiteboard element the candidate actually drew; no score is shown if the coverage step failed), red flags computed in code (components before requirements, no numbers, technology without a reason), curveball, phases reached and the final board. Score deltas only compare reports on the same rubric.
+
+**The lab**
+- 24 cases (12 new, shipped as draft: unique IDs, KV store, message queue, job scheduler, typeahead, web crawler, Instagram, collaborative editor, YouTube, UPI-style payments, flash sale, food delivery). Every case has SDE-1/SDE-2 variants, a weighted must-cover checklist, 3 curveballs, 5 common mistakes and a reference diagram; the reference unlocks after an attempt.
+- 25 building-block primers with a 30-second answer and three server-graded check questions.
+- Estimation trainer: seeded drills graded in code with worked steps, plus a latency/powers-of-two card.
+- Design fundamentals drill: 5 scenario questions in 15 minutes, graded on key points that must be quoted from your answer; misses become revision cards.
+
 ## 0.10.0 — 2026-11-25 · Live feel, integrity, and a 206-problem bank
 **Live interviews**
 - Interviewer replies stream over SSE (`delta` events, then `done` with metadata and timing); speech starts at the first finished sentence.

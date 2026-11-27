@@ -4,7 +4,7 @@
 - Authorization: RLS on every user table and storage objects; service-role key server-only, used for account deletion and for server-only writes (interview status/report/score, transcripts, judge submissions, project analysis), always scoped by `user_id`.
 - Input: zod on every action; DB CHECK constraints on enums and sizes; `safeNext()` blocks open redirects.
 - Headers: nosniff, X-Frame-Options DENY, HSTS, strict referrer, Permissions-Policy (mic self only).
-- Content-Security-Policy (enforced): per-request nonce set in `proxy.ts`, `script-src 'self' 'nonce-…' https://cdn.jsdelivr.net 'wasm-unsafe-eval'`, `worker-src 'self' blob:`, `frame-ancestors 'none'`, `object-src 'none'`; no `unsafe-eval` (zod runs jitless, the JS runner uses blob workers). `connect-src` limited to Supabase, jsDelivr, Hugging Face and GitHub. Violations → `/api/csp-report`. `CSP_MODE=report-only|off` exists for debugging.
+- Content-Security-Policy (enforced): per-request nonce set in `proxy.ts`, `script-src 'self' 'nonce-…' https://cdn.jsdelivr.net 'wasm-unsafe-eval'`, `worker-src 'self' blob:`, `frame-ancestors 'none'`, `object-src 'none'`; no `unsafe-eval` (zod runs jitless, the JS runner uses blob workers). `connect-src` limited to Supabase, jsDelivr, Hugging Face and GitHub. Violations → `/api/csp-report`. Excalidraw's fonts are copied into `public/` at build and its CDN fallback is rewritten to our origin (`scripts/copy-excalidraw-assets.mjs`), so the whiteboard needs no extra CSP source. `CSP_MODE=report-only|off` exists for debugging.
 - AI: keys server-only; untrusted content delimited; outputs schema-validated; no prompt/response bodies logged.
 - Code execution (Phase 3): never on the server; sandboxed iframe without `allow-same-origin` + worker with timeouts.
 - Data: account deletion removes rows (cascade) and storage files. No audio stored.
@@ -17,3 +17,7 @@
 - Result markers carry a per-run random nonce and the last marker per test wins, so printing fake results doesn't pass tests. Browser-run results are reported by the client and labelled as such; only server-side Submit counts as a submission.
 - Hidden tests are never sent to the browser; only the first failing hidden case is revealed after a Submit.
 - Candidate code, diffs and events reach the interviewer model inside `<untrusted>` blocks.
+
+## Content review
+- Admins are listed in `ADMIN_EMAILS` (env only) and must have a confirmed email. Review status is written only by the server; users read only the status columns.
+- Answer keys for quizzes, primer checks and design drill key points stay on the server; option order is shuffled per view.
