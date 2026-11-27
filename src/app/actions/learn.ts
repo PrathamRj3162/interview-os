@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { QUESTION_BY_ID, TOPIC_BY_SLUG, QUIZ_SIZE } from "@/lib/learn/fundamentals";
 import { review, type Grade } from "@/lib/learn/sm2";
+import { PRIMER_BY_SLUG } from "@/lib/learn/primers";
 
 const progressSchema = z.object({
   itemType: z.enum(["lesson", "hld", "lld"]),
@@ -43,6 +44,23 @@ export async function markAttempted(input: z.input<typeof attemptSchema>): Promi
   );
   revalidatePath(`/system-design/${parsed.data.slug}`);
   return { ok: !error };
+}
+
+const primerSchema = z.object({ slug: z.string().regex(/^[a-z0-9-]{2,80}$/), answers: z.array(z.number().int().min(-1).max(9)).max(10) });
+
+/** Grades a primer's check questions on the server (the key never reaches the browser). All correct = studied. */
+export async function gradePrimer(input: z.input<typeof primerSchema>): Promise<{ ok: boolean; results: { correct: boolean; answer: string; why: string }[] }> {
+  const parsed = primerSchema.safeParse(input);
+  const p = parsed.success ? PRIMER_BY_SLUG[parsed.data.slug] : undefined;
+  if (!parsed.success || !p) return { ok: false, results: [] };
+  const { supabase, user } = await getCurrentUser();
+  if (!user) return { ok: false, results: [] };
+  const results = p.checks.map((c, i) => ({ correct: parsed.data.answers[i] === c.answer, answer: c.options[c.answer], why: c.why }));
+  if (results.every((r) => r.correct)) {
+    await supabase.from("user_progress").upsert({ user_id: user.id, item_type: "lesson", item_slug: `primer:${p.slug}`, topic: p.title, status: "completed", updated_at: new Date().toISOString() }, { onConflict: "user_id,item_type,item_slug" });
+    revalidatePath("/system-design/primers");
+  }
+  return { ok: true, results };
 }
 
 // ───────────── CS fundamentals quizzes ─────────────

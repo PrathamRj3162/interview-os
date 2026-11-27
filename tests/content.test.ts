@@ -57,7 +57,33 @@ describe("content registry", () => {
     for (const i of cases) for (const c of i.checks) expect(c.ok, `${i.meta.id}: ${c.name} ${c.detail ?? ""}`).toBe(true);
     expect(cases.filter((i) => i.meta.status === "draft")).toHaveLength(12);
   });
-  it("every live item passes its automated checks (same checks /review shows)", () => {
-    for (const i of items.filter((x) => x.meta.status === "live")) for (const c of i.checks) expect(c.ok, `${i.meta.id}: ${c.name} ${c.detail ?? ""}`).toBe(true);
+  it("every item, draft or live, passes its automated checks (same checks /review shows)", () => {
+    expect(items.filter((i) => i.meta.type === "primer")).toHaveLength(25);
+    for (const i of items) for (const c of i.checks) expect(c.ok, `${i.meta.id}: ${c.name} ${c.detail ?? ""}`).toBe(true);
+  });
+});
+
+import { DESIGN_QUESTIONS, verifyKeyPoints } from "@/lib/learn/design-questions";
+
+describe("design fundamentals drill", () => {
+  const q = DESIGN_QUESTIONS.find((x) => x.slug === "add-cache")!;
+  const answer = "I would use cache-aside: read Redis first and on a miss read the database, then set a TTL of five minutes.";
+  it("credits a key point only with a real quote of 3+ words from that answer; score computed in code", () => {
+    const v = verifyKeyPoints(q, answer, [
+      { id: "pattern", quote: "read Redis first and on a miss read the database" },
+      { id: "ttl", quote: "set a TTL" },                       // real but only 3 words → ok
+      { id: "stampede", quote: "use request coalescing for hot keys" }, // never said → dropped
+      { id: "pattern", quote: "read Redis first" },             // duplicate id → dropped
+      { id: "nonsense", quote: "read Redis first and on" },     // unknown key point → dropped
+    ]);
+    expect(v.covered.map((c) => c.id)).toEqual(["pattern", "ttl"]);
+    expect(v.missed.map((m) => m.id)).toEqual(["invalidation", "stampede", "stale"]);
+    expect(v.dropped).toBe(3);
+  });
+  it("20 scenario questions, all passing their checks, shipped as draft", () => {
+    expect(DESIGN_QUESTIONS).toHaveLength(20);
+    const qs = allContent().filter((i) => i.meta.type === "design-question");
+    expect(qs).toHaveLength(20);
+    expect(qs.every((i) => i.meta.status === "draft" && i.checks.every((c) => c.ok))).toBe(true);
   });
 });

@@ -14,6 +14,7 @@ import { DesignDiagram } from "@/components/learn/design-diagram";
 import { Sketchpad } from "@/components/learn/sketchpad";
 import { AttemptButton } from "@/components/learn/attempt-button";
 import { Lock } from "lucide-react";
+import { PRIMERS, primerMeta } from "@/lib/learn/primers";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   return { title: CASE_BY_SLUG[(await params).slug]?.title ?? "Design case" };
@@ -90,6 +91,15 @@ export default async function DesignCasePage({ params }: { params: Promise<{ slu
       <Section title="Common mistakes" items={c.mistakes} />
       <Section title="What interviewers check (the must-cover list)" items={c.checklist?.map((x) => `${x.item} (weight ${x.weight})`)} />
       </>)}
+      {(() => {
+        const blocks = PRIMERS.filter((pr) => pr.cases.includes(slug) && gate.visible(primerMeta(pr)));
+        return blocks.length > 0 && (
+          <Card className="p-4">
+            <p className="font-medium">Building blocks this case uses</p>
+            <ul className="mt-2 flex flex-wrap gap-2 text-sm">{blocks.map((b) => <li key={b.slug}><Link className="underline hover:text-accent" href={`/system-design/primers/${b.slug}`}>{b.title}</Link></li>)}</ul>
+          </Card>
+        );
+      })()}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-muted">A reference answer written for Interview OS — other designs can be just as good if the trade-offs are argued well.</p>
         <ReportButton itemId={meta.id} version={meta.version} title={c.title} />

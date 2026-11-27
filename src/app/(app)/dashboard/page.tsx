@@ -49,7 +49,7 @@ export default async function DashboardPage() {
   const [subs, accepted, quizzes, interviews, quota, resumeRes, recentRes, tasksRes] = await Promise.all([
     supabase.from("submissions").select("id", { count: "exact", head: true }),
     supabase.from("submissions").select("id", { count: "exact", head: true }).eq("status", "accepted"),
-    supabase.from("quiz_attempts").select("score,total").limit(1000),
+    supabase.from("quiz_attempts").select("score,total").neq("quiz_slug", "design-fundamentals").limit(1000), // CS accuracy: MCQ quizzes only
     supabase.from("mock_interviews").select("overall_score").eq("status", "completed").limit(1000),
     remainingQuota(supabase, user.id),
     supabase.from("resumes").select("id, file_name, resume_analyses(overall_score, ai_findings, created_at)").eq("is_active", true).limit(1).maybeSingle(),

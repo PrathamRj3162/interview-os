@@ -99,6 +99,16 @@ function mockReplyJson(messages: ChatMessage[], system: string): string {
     });
   }
 
+  if (system.includes("against listed KEY POINTS")) {
+    // Claim the first key point of each answered question with a real quote, plus one invented quote (must be dropped).
+    const body = messages.filter((m) => m.role === "user").map((m) => m.content).join("\n");
+    const results = [...body.matchAll(/^Q(\d+): [^\n]*\nKEY POINTS:\n- ([a-z0-9_]+):[\s\S]*?<untrusted[^>]*>\n?([\s\S]*?)\n?<\/untrusted>/gm)].map((m) => ({
+      index: Number(m[1]),
+      covered: [{ id: m[2], quote: m[3].trim().split(/\s+/).slice(0, 4).join(" ") }, { id: m[2], quote: "words the candidate never wrote anywhere" }],
+    }));
+    return JSON.stringify({ results });
+  }
+
   if (system.includes('{"hint"')) return JSON.stringify({ hint: "Consider the constraints again." });
 
   if (system.includes("exactly 3 short sentences")) {
