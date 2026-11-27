@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { dayKey } from "@/lib/progress/xp";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarClock, Clock, Target, Sparkles, CheckCircle2, Circle, ArrowRight } from "lucide-react";
@@ -44,8 +45,8 @@ export default async function DashboardPage() {
   const levelPct = Math.round(((p.xp - p.levelStart) / Math.max(1, p.nextLevelAt - p.levelStart)) * 100);
   if (!profile?.onboarded_at) redirect("/onboarding");
 
-  const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Days are IST everywhere (XP, streaks, tasks); the server runs in UTC.
+  const today = dayKey(new Date());
   const [subs, accepted, quizzes, interviews, quota, resumeRes, recentRes, tasksRes] = await Promise.all([
     supabase.from("submissions").select("id", { count: "exact", head: true }),
     supabase.from("submissions").select("id", { count: "exact", head: true }).eq("status", "accepted"),
@@ -71,7 +72,7 @@ export default async function DashboardPage() {
   const resume = resumeRes.data;
   const resumeAnalysis = resume ? [...(resume.resume_analyses ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))[0] : null;
   const recent = recentRes.data ?? [];
-  const tasks = (tasksRes.data ?? []).filter((t) => !t.done_at || t.done_at.slice(0, 10) === today).slice(0, 8);
+  const tasks = (tasksRes.data ?? []).filter((t) => !t.done_at || dayKey(t.done_at) === today).slice(0, 8);
   const openTasks = tasks.filter((t) => !t.done_at);
   const days = daysUntil(profile.deadline);
   const providers = aiStatus();

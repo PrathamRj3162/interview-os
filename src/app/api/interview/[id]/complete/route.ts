@@ -1,4 +1,5 @@
 import { CASE_BY_SLUG } from "@/lib/learn/design";
+import { dayKey } from "@/lib/progress/xp";
 import { DESIGN_PHASE_LABELS, type DesignPhase } from "@/lib/interview/design-phases";
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser, createAdminClient } from "@/lib/supabase/server";
@@ -31,7 +32,6 @@ function nextProblems(p: Problem, solved: Set<string>) {
 
 export const maxDuration = 120;
 
-const localDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /**
  * Ends the interview and generates the report exactly once.
@@ -166,11 +166,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         plan = (await supabase.from("study_plans").insert({ user_id: user.id, inputs: { source: "interview", interview_id: id } }).select("id").single()).data;
       }
       if (plan) {
-        const today = new Date();
+        // Due dates are IST calendar days (the server runs in UTC).
         await admin.from("study_tasks").insert(report.priorities.map((p, i) => ({
           source: "report",
           plan_id: plan!.id, user_id: user.id, kind: p.kind,
-          due_date: localDate(new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)),
+          due_date: dayKey(new Date(Date.now() + i * 86_400_000)),
           title: `${p.topic}: ${p.action}`.slice(0, 300),
           reason: `From your ${new Date(iv.started_at).toLocaleDateString("en-IN")} mock interview — ${p.why}`.slice(0, 500),
           link: `/interview/${id}/report`, minutes: 30,
