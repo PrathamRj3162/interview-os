@@ -52,9 +52,11 @@ export function scoreCoverage(checklist: ChecklistItem[], claimed: { id: string;
 
 export const TECH_TERMS = [
   "redis", "memcached", "kafka", "rabbitmq", "sqs", "kinesis", "pulsar", "cassandra", "dynamodb", "mongodb", "postgres", "postgresql", "mysql",
-  "elasticsearch", "s3", "cdn", "zookeeper", "etcd", "hbase", "bigtable", "spanner", "cockroachdb", "kubernetes", "nginx", "load balancer",
-  "consistent hashing", "bloom filter", "websocket", "websockets", "grpc", "graphql", "hadoop", "spark", "flink",
+  "elasticsearch", "s3", "zookeeper", "etcd", "hbase", "bigtable", "spanner", "cockroachdb", "kubernetes", "nginx",
+  "websocket", "websockets", "grpc", "graphql", "hadoop", "spark", "flink",
 ];
+// Named technologies only: generic building blocks (load balancer, CDN, cache, queue) aren't "a technology chosen
+// without a reason" — they'd make the flag fire on almost every design (seen in a real-AI check).
 const NUMBER = /\b\d[\d,.]*\s*(k|m|b|bn|mn|million|billion|thousand|lakh|lakhs|crore|crores|qps|rps|tps|req|reqs|requests|users|gb|tb|mb|pb|kb|ms|%|x|per\s+(second|sec|day|month|minute|hour)|\/\s?s(ec)?|\/day)\b/i;
 const QUESTION_OR_SCOPE = /\?|\b(how many|requirements?|should (it|we)|do we need|is it|are we|scope|read[- ]heavy|write[- ]heavy|latency|availability|consistency|assume|assumption)\b/i;
 const REASON = /\b(because|since|so that|so we|so it|to avoid|to handle|to reduce|to keep|to absorb|which (gives|lets|allows|means)|trade-?offs?|instead of|rather than|for (low|fast|high|durab|consisten|availab|order|throughput|latency))/i;
